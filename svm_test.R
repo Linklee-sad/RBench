@@ -14,6 +14,7 @@ classification_repeat <- fit_svm_analysis(iris, 5, 1:4, "classification", 0.8, "
 stopifnot(classification$task == "classification", classification$train_n + classification$test_n == nrow(iris),
   nrow(classification$details) == 3, sum(classification$support$支持向量数) == nrow(classification$model$SV),
   classification$metrics$数值[1] >= 0.7,
+  is.matrix(classification$probabilities), nrow(classification$probabilities) == classification$test_n,
   identical(as.character(classification$predicted), as.character(classification_repeat$predicted)),
   grepl("支持向量", classification$report), grepl("参数含义", classification$report))
 
@@ -34,8 +35,10 @@ invalid <- tryCatch({ fit_svm_analysis(iris, 5, 1:4, "classification", cost = 0)
 stopifnot(grepl("成本参数", invalid))
 
 classification_plot <- build_svm_evaluation_plot(classification)
+unified_evaluation <- classification_evaluation(classification$actual, classification$predicted, classification$probabilities)
 regression_plot <- build_svm_evaluation_plot(regression)
-stopifnot(inherits(classification_plot, "ggplot"), inherits(regression_plot, "ggplot"))
+stopifnot(inherits(classification_plot, "ggplot"), inherits(regression_plot, "ggplot"),
+  nrow(unified_evaluation$per_class) == 3)
 test_directory <- tempfile("easyr-svm-"); dir.create(test_directory)
 plot_file <- file.path(test_directory, "evaluation.png")
 ggplot2::ggsave(plot_file, classification_plot, width = 8, height = 5, dpi = 96)

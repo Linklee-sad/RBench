@@ -42,8 +42,10 @@ future <- project; future$version <- 999L
 stopifnot(inherits(try(validate_easyr_project(future), silent = TRUE), "try-error"))
 
 testServer(import_server, {
-  session$setInputs(demo = 1)
-  stopifnot(length(datasets()) == 1L)
+  session$setInputs(example_dataset = "airpassengers", demo = 1)
+  stopifnot(length(datasets()) == 1L,
+    identical(names(datasets()), easyr_example_dataset("airpassengers")$name),
+    inherits(current_data()$Date, "Date"))
   restore_state(list(datasets = sample_datasets, active = "groups.csv"))
   session$flushReact()
   stopifnot(length(datasets()) == 2L, identical(active(), "groups.csv"), identical(current_data(), sample_datasets[["groups.csv"]]))

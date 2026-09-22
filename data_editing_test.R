@@ -42,6 +42,13 @@ sorted <- sort_table_rows(data.frame(value = c(3, NA, 1, 2)), 1, "descending", T
 stopifnot(identical(sorted$value, c(3, 2, 1, NA)))
 stopifnot(identical(convert_editor_column(c("1,200", "3.5", NA), "numeric"), c(1200, 3.5, NA_real_)))
 stopifnot(inherits(convert_editor_column(c("2026-01-02", "2026/03/04"), "date"), "Date"))
+bootstrap_source <- data.frame(id = 1:4, group = factor(c("A", "B", "A", "B")), day = as.Date("2026-01-01") + 0:3)
+bootstrap_a <- bootstrap_expand_rows(bootstrap_source, 10, seed = 42)
+bootstrap_b <- bootstrap_expand_rows(bootstrap_source, 10, seed = 42)
+stopifnot(nrow(bootstrap_a) == 10L, identical(bootstrap_a, bootstrap_b),
+  identical(bootstrap_a[1:4, , drop = FALSE], bootstrap_source),
+  all(bootstrap_a$id[5:10] %in% bootstrap_source$id), is.factor(bootstrap_a$group), inherits(bootstrap_a$day, "Date"))
+stopifnot(inherits(try(bootstrap_expand_rows(bootstrap_source, 4, 1), silent = TRUE), "try-error"))
 missing_data <- data.frame(amount = c(1, NA, 3), group = c("A", NA, "A"), note = c("x", NA, "z"))
 column_filled <- clean_table_by_column(missing_data, 1:3, "keep", c(amount = "mean", group = "mode"))
 stopifnot(identical(column_filled$amount, c(1, 2, 3)), identical(column_filled$group, c("A", "A", "A")), is.na(column_filled$note[2]))
@@ -93,6 +100,14 @@ testServer(workbench_server, args = list(
   session$setInputs(reset = 2)
   session$setInputs(columns = c("1", "2"), missing = "keep", deduplicate = FALSE)
   stopifnot(identical(data(), module_data))
+
+  session$setInputs(bootstrap_target = 8, bootstrap_seed = 7, bootstrap_shuffle = FALSE, bootstrap_expand = 1)
+  session$setInputs(columns = c("1", "2"), missing = "keep", deduplicate = FALSE)
+  stopifnot(nrow(data()) == 8L, identical(data()[1:3, , drop = FALSE], module_data),
+    grepl("新增 5 行", edit_status()))
+  session$setInputs(undo = 2)
+  session$setInputs(columns = c("1", "2"), missing = "keep", deduplicate = FALSE)
+  stopifnot(identical(data(), module_data))
 })
 
 testServer(workbench_server, args = list(
@@ -111,4 +126,4 @@ testServer(workbench_server, args = list(
   stopifnot(is.na(data()$amount[2]), is.na(data()$group[2]))
 })
 
-cat("整理数据的分字段缺失值规则、文字清理、筛选、排序、类型转换、行列编辑、查找、撤销和恢复检查通过。\n")
+cat("整理数据的缺失值规则、文字清理、Bootstrap 扩充、筛选、排序、类型转换、行列编辑、查找、撤销和恢复检查通过。\n")

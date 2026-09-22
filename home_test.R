@@ -7,11 +7,28 @@ source("R/home.R")
 rendered <- htmltools::renderTags(startup_ui("startup"))$html
 stopifnot(
   grepl("startup-card", rendered),
-  grepl("创建新项目", rendered),
+  grepl("创建数据分析项目", rendered),
+  grepl("进入学习模式", rendered),
   grepl("打开已有 EasyR 项目", rendered),
   grepl("选择后自动打开项目", rendered),
   !grepl("startup-open_project", rendered, fixed = TRUE),
-  grepl("试用示例数据", rendered)
+  grepl("选择示例数据集", rendered),
+  grepl("使用所选示例开始", rendered)
+)
+
+catalog <- easyr_example_catalog()
+stopifnot(
+  length(catalog) >= 7L,
+  identical(unname(easyr_example_choices()), names(catalog)),
+  all(vapply(names(catalog), function(key) {
+    example <- easyr_example_dataset(key)
+    is.data.frame(example$data) && nrow(example$data) > 0L && ncol(example$data) > 0L
+  }, logical(1))),
+  inherits(easyr_example_dataset("airpassengers")$data$Date, "Date"),
+  anyNA(easyr_example_dataset("airquality")$data),
+  identical(dim(easyr_example_dataset("boston")$data), c(506L, 14L)),
+  "medv" %in% names(easyr_example_dataset("boston")$data),
+  nrow(easyr_example_dataset("titanic")$data) == 2201L
 )
 
 values <- reactiveVal(list())
@@ -27,6 +44,7 @@ imported <- list(
   }
 )
 entered <- reactiveVal(0L)
+learned <- reactiveVal(0L)
 app_session <- new.env(parent = emptyenv())
 app_session$onFlushed <- function(callback, once = FALSE) callback()
 app_session$sendInputMessage <- function(inputId, message) invisible(NULL)
@@ -34,14 +52,20 @@ channel <- new.env(parent = emptyenv())
 
 testServer(startup_server, args = list(
   imported = imported, project_channel = channel, app_input = reactiveValues(),
-  app_session = app_session, enter_workspace = function() entered(entered() + 1L)
+  app_session = app_session, enter_workspace = function() entered(entered() + 1L),
+  enter_learning = function() learned(learned() + 1L)
 ), {
   session$setInputs(new_project = 1)
   session$flushReact()
   stopifnot(entered() == 1L)
-  session$setInputs(sample = 1)
+  session$setInputs(learning = 1)
   session$flushReact()
-  stopifnot(entered() == 2L, identical(names(values()), "内置示例 iris"), identical(values()[[1L]], iris))
+  stopifnot(learned() == 1L)
+  session$setInputs(example_dataset = "mtcars", sample = 1)
+  session$flushReact()
+  selected_example <- easyr_example_dataset("mtcars")
+  stopifnot(entered() == 2L, identical(names(values()), selected_example$name),
+    identical(values()[[1L]], selected_example$data))
 })
 
 app_env <- new.env(parent = globalenv())
@@ -49,7 +73,10 @@ sys.source("app.R", envir = app_env)
 app_html <- htmltools::renderTags(app_env$ui)$html
 stopifnot(
   grepl("startup-new_project", app_html, fixed = TRUE),
+  grepl("startup-learning", app_html, fixed = TRUE),
+  grepl("output.learning_ready", app_html, fixed = TRUE),
   grepl("data-value=\"data_workspace\"", app_html, fixed = TRUE),
+  !grepl("data-value=\"distributions\">教学模式</a>", app_html, fixed = TRUE),
   !grepl("data-value=\"home\"", app_html, fixed = TRUE)
 )
 
@@ -66,10 +93,16 @@ startup_upload <- data.frame(
 
 testServer(app_env$server, {
   session$flushReact()
-  stopifnot(identical(workspace_started(), FALSE))
+  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), FALSE))
+  session$setInputs(`startup-learning` = 1)
+  session$flushReact()
+  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), TRUE))
+  session$setInputs(leave_learning = 1)
+  session$flushReact()
+  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), FALSE))
   session$setInputs(`startup-new_project` = 1)
   session$flushReact()
-  stopifnot(identical(workspace_started(), TRUE))
+  stopifnot(identical(workspace_started(), TRUE), identical(learning_started(), FALSE))
 })
 
 testServer(app_env$server, {
@@ -79,4 +112,4 @@ testServer(app_env$server, {
 })
 unlink(startup_project_file)
 
-cat("开始界面、新建项目、示例数据和无首页工作台检查通过。\n")
+cat("开始界面、分析项目、独立学习模式、示例数据和无首页工作台检查通过。\n")

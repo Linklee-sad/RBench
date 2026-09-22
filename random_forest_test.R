@@ -16,6 +16,7 @@ classification_repeat <- fit_random_forest(iris, 5, 1:4, "classification", 0.8, 
 stopifnot(classification$task == "classification", classification$train_n + classification$test_n == nrow(iris),
   nrow(classification$importance) == 4, nrow(classification$details) == 3,
   classification$metrics$数值[1] >= 0.7,
+  is.matrix(classification$probabilities), nrow(classification$probabilities) == classification$test_n,
   identical(as.character(classification$predicted), as.character(classification_repeat$predicted)),
   grepl("测试集", classification$report), grepl("变量重要性", classification$report))
 
@@ -33,9 +34,11 @@ invalid <- tryCatch({ fit_random_forest(iris, 5, 1:4, "classification", 0.8, 100
 stopifnot(grepl("候选字段数", invalid))
 
 evaluation_plot <- build_rf_evaluation_plot(classification)
+unified_evaluation <- classification_evaluation(classification$actual, classification$predicted, classification$probabilities)
 importance_plot <- build_rf_importance_plot(classification)
 regression_plot <- build_rf_evaluation_plot(regression)
-stopifnot(inherits(evaluation_plot, "ggplot"), inherits(importance_plot, "ggplot"), inherits(regression_plot, "ggplot"))
+stopifnot(inherits(evaluation_plot, "ggplot"), inherits(importance_plot, "ggplot"), inherits(regression_plot, "ggplot"),
+  nrow(unified_evaluation$per_class) == 3)
 test_directory <- tempfile("easyr-random-forest-")
 dir.create(test_directory)
 evaluation_file <- file.path(test_directory, "evaluation.png")

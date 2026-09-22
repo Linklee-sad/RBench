@@ -2,8 +2,8 @@ source("setup.R")
 library(shiny)
 source("R/algorithm_tutorials.R")
 
-keys <- c("regression", "svm", "pca", "kmeans", "timeseries")
-expected_steps <- c(regression = 6L, svm = 6L, pca = 6L, kmeans = 6L, timeseries = 7L)
+keys <- c("regression", "logistic", "advanced_regression", "decision_tree", "svm", "pca", "kmeans", "timeseries")
+expected_steps <- c(regression = 6L, logistic = 6L, advanced_regression = 6L, decision_tree = 6L, svm = 6L, pca = 6L, kmeans = 6L, timeseries = 7L)
 
 for (key in keys) {
   lessons <- algorithm_tutorial_lessons(key)
@@ -16,6 +16,9 @@ for (key in keys) {
 
 interactive_plots <- list(
   algorithm_tutorial_plot("regression", 2, list(sample_n = 80, slope = -2, noise = .5, outlier = TRUE), 1),
+  algorithm_tutorial_plot("logistic", 5, list(sample_n = 160, effect = 2, threshold = .35), 1),
+  algorithm_tutorial_plot("advanced_regression", 5, list(correlation = .9, lambda = .4, curve = 1.4), 1),
+  algorithm_tutorial_plot("decision_tree", 4, list(maxdepth = 4, cp = .005, overlap = .4), 1),
   algorithm_tutorial_plot("svm", 4, list(shape = "curved", kernel = "radial", cost = 5, gamma = 2), 1),
   algorithm_tutorial_plot("pca", 5, list(correlation = -.7, scale_ratio = 4, standardize = FALSE), 1),
   algorithm_tutorial_plot("kmeans", 3, list(true_groups = 4, centers = 2, overlap = 1, standardize = TRUE), 1),
@@ -35,4 +38,4 @@ testServer(algorithm_tutorial_server, args = list(key = "regression"), {
   session$setInputs(reset = 1); session$flushReact(); stopifnot(step() == 1L)
 })
 
-cat("线性回归、SVM、PCA、K-means 和时间序列交互参数、分步教程、示意图及手动翻页检查通过。\n")
+cat("线性回归、逻辑回归、高级回归、决策树、SVM、PCA、K-means 和时间序列交互参数、分步演示、示意图及手动翻页检查通过。\n")

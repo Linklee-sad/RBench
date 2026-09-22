@@ -7,6 +7,17 @@ stopifnot(!ai_config_ready(list(api_key = "", endpoint = "https://example.com/v1
 stopifnot(ai_config_ready(list(provider = "custom", api_key = "", endpoint = "http://127.0.0.1:11434/v1", model = "local-model")))
 stopifnot(identical(ai_clean_endpoint("https://example.com/v1", "chat"), "https://example.com/v1/chat/completions"))
 stopifnot(identical(ai_clean_endpoint("https://example.com/v1/responses", "responses"), "https://example.com/v1/responses"))
+stopifnot(identical(ai_clean_endpoint("https://generativelanguage.googleapis.com/v1beta/models", "gemini", "gemini-3.8-flash"),
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"))
+stopifnot(identical(ai_clean_endpoint("https://api.anthropic.com/v1", "anthropic", "claude-sonnet-5"),
+  "https://api.anthropic.com/v1/messages"))
+stopifnot(identical(ai_provider_defaults("gemini")$protocol, "gemini"),
+  identical(ai_provider_defaults("claude")$protocol, "anthropic"),
+  "gemini-3.8-flash" %in% ai_provider_models("gemini"),
+  "claude-sonnet-5" %in% ai_provider_models("claude"))
+stopifnot(identical(ai_auth_headers("google-key", "gemini")$`x-goog-api-key`, "google-key"),
+  identical(ai_auth_headers("claude-key", "anthropic")$`x-api-key`, "claude-key"),
+  identical(ai_auth_headers("claude-key", "anthropic")$`anthropic-version`, "2023-06-01"))
 
 local_config_path <- tempfile("easyr-ai-config-", fileext = ".json")
 local_value <- list(provider = "custom", model = "local-model", endpoint = "http://127.0.0.1:11434/v1",
@@ -22,9 +33,14 @@ stopifnot(!file.exists(local_config_path), is.null(ai_read_local_config(local_co
 d <- data.frame(name = c("甲", "乙"), email = c("a@example.com", "b@example.com"), value = c(1, NA))
 summary_only <- ai_dataset_profile(d, FALSE)
 with_sample <- ai_dataset_profile(d, TRUE)
+configured_sample <- ai_profile_for_config(d, list(include_head = TRUE, head_rows = 1L))
 stopifnot(!grepl("a@example.com", summary_only, fixed = TRUE))
 stopifnot(!grepl("a@example.com", with_sample, fixed = TRUE))
 stopifnot(grepl("<已隐藏敏感值>", with_sample, fixed = TRUE))
+stopifnot(grepl('"sample_rows"', configured_sample, fixed = TRUE),
+  length(jsonlite::fromJSON(configured_sample)$sample_rows[[1]]) == 1L,
+  !grepl('"sample_rows"', ai_profile_for_config(d, list(include_head = FALSE)), fixed = TRUE),
+  identical(ai_sample_rows(list(head_rows = 99L)), 10L))
 stopifnot(all(c("name", "email") %in% ai_sensitive_columns(d)))
 
 detailed <- ai_analysis_summary(iris)
@@ -46,14 +62,19 @@ ai_call <- function(config, system_prompt, user_prompt, max_tokens = 1600L, tran
   "# 模拟报告"
 }
 testServer(ai_report_server, args = list(
-  config = reactive(list(provider = "custom", api_key = "", endpoint = "http://localhost/v1", model = "demo", protocol = "chat", language = "zh", max_tokens = 1000L)),
+  config = reactive(list(provider = "custom", api_key = "", endpoint = "http://localhost/v1", model = "demo", protocol = "chat", language = "zh", max_tokens = 1000L,
+    include_head = TRUE, head_rows = 1L)),
   algorithm = "测试算法", local_report = reactive("本地报告"),
-  computed_context = reactive(list(sample = list(n = 123L), metrics = data.frame(name = "RMSE", value = 1.25)))
+  computed_context = reactive(list(sample = list(n = 123L), metrics = data.frame(name = "RMSE", value = 1.25))),
+  source_data = reactive(data.frame(email = "hidden@example.com", score = 88))
 ), {
   session$setInputs(confirm = TRUE, generate = 1)
   session$flushReact()
   stopifnot(grepl("computed_results_json", captured_report$prompt, fixed = TRUE),
     grepl('"n": 123', captured_report$prompt, fixed = TRUE),
+    grepl("dataset_profile_with_head", captured_report$prompt, fixed = TRUE),
+    grepl('"score": 88', captured_report$prompt, fixed = TRUE),
+    !grepl("hidden@example.com", captured_report$prompt, fixed = TRUE),
     grepl("只使用所提供的数据", captured_report$prompt, fixed = TRUE))
 })
 ai_call <- original_ai_call
@@ -70,13 +91,49 @@ stopifnot(identical(captured$endpoint, "https://example.com/v1/chat/completions"
 stopifnot(identical(captured$payload$messages[[2]]$content, "user"))
 stopifnot(identical(captured$payload$max_tokens, 321L))
 
+gemini_config <- c(ai_provider_defaults("gemini"), list(provider = "gemini", api_key = "google-key"))
+invisible(ai_call(gemini_config, "system", "user", 222, fake_transport))
+stopifnot(identical(captured$protocol, "gemini"), grepl("gemini-3.8-flash:generateContent$", captured$endpoint),
+  identical(captured$payload$system_instruction$parts[[1]]$text, "system"),
+  identical(captured$payload$contents[[1]]$parts[[1]]$text, "user"),
+  identical(captured$payload$generationConfig$maxOutputTokens, 222L))
+
+claude_config <- c(ai_provider_defaults("claude"), list(provider = "claude", api_key = "claude-key"))
+invisible(ai_call(claude_config, "system", "user", 333, fake_transport))
+stopifnot(identical(captured$protocol, "anthropic"), identical(captured$endpoint, "https://api.anthropic.com/v1/messages"),
+  identical(captured$payload$system, "system"), identical(captured$payload$messages[[1]]$content, "user"),
+  identical(captured$payload$max_tokens, 333L))
+
 settings_path <- tempfile("easyr-ai-settings-", fileext = ".json")
+settings_ui <- htmltools::renderTags(ai_settings_ui("ai_settings"))$html
+stopifnot(
+  grepl("ai-provider-character-stage", settings_ui, fixed = TRUE),
+  grepl("ai-characters/chatgpt.png", settings_ui, fixed = TRUE),
+  grepl("ai-characters/deepseek.png", settings_ui, fixed = TRUE),
+  grepl("ai-characters/gemini.png", settings_ui, fixed = TRUE),
+  grepl("ai-characters/claude.png", settings_ui, fixed = TRUE),
+  grepl("ai-characters/qwen.png", settings_ui, fixed = TRUE),
+  grepl("ai-characters/custom.png", settings_ui, fixed = TRUE),
+  !grepl("ai-character-caption", settings_ui, fixed = TRUE),
+  !grepl("数据分析助手", settings_ui, fixed = TRUE),
+  grepl("ai_settings-provider", settings_ui, fixed = TRUE),
+  file.exists("www/ai-characters/chatgpt.png"),
+  file.exists("www/ai-characters/deepseek.png"),
+  file.exists("www/ai-characters/gemini.png"),
+  file.exists("www/ai-characters/claude.png"),
+  file.exists("www/ai-characters/qwen.png"),
+  file.exists("www/ai-characters/custom.png")
+)
 testServer(ai_settings_server, args = list(config_path = settings_path), {
   session$setInputs(provider = "custom", model = "third-party-model", api_key = "", endpoint = "http://127.0.0.1:11434/v1", protocol = "chat")
   session$flushReact()
   current <- config()
   stopifnot(identical(current$provider, "custom"), identical(current$model, "third-party-model"),
     identical(current$endpoint, "http://127.0.0.1:11434/v1"), identical(current$protocol, "chat"), identical(current$api_key, ""))
+  session$setInputs(include_head = TRUE, head_rows = 7)
+  session$flushReact()
+  current <- config()
+  stopifnot(isTRUE(current$include_head), identical(current$data_mode, "sample"), identical(current$head_rows, 7L))
   session$setInputs(api_key = "saved-key", allow_local_save = TRUE, save_local = 1)
   session$flushReact()
   stopifnot(file.exists(settings_path), identical(ai_read_local_config(settings_path)$api_key, "saved-key"))
@@ -85,8 +142,22 @@ testServer(ai_settings_server, args = list(config_path = settings_path), {
   stopifnot(!file.exists(settings_path))
 })
 
+provider_settings_path <- tempfile("easyr-ai-provider-settings-", fileext = ".json")
+testServer(ai_settings_server, args = list(config_path = provider_settings_path), {
+  session$setInputs(provider = "gemini", model = "gemini-3.8-flash", api_key = "google-key")
+  session$flushReact()
+  stopifnot(identical(config()$provider, "gemini"), identical(config()$protocol, "gemini"),
+    identical(config()$endpoint, ai_provider_defaults("gemini")$endpoint))
+  session$setInputs(provider = "claude", model = "claude-sonnet-5", api_key = "claude-key")
+  session$flushReact()
+  stopifnot(identical(config()$provider, "claude"), identical(config()$protocol, "anthropic"),
+    identical(config()$endpoint, ai_provider_defaults("claude")$endpoint))
+})
+
 stopifnot(identical(ai_extract_text(list(output_text = "ok"), "responses"), "ok"))
 stopifnot(identical(ai_extract_text(list(choices = list(list(message = list(content = "ok")))), "chat"), "ok"))
+stopifnot(identical(ai_extract_text(list(candidates = list(list(content = list(parts = list(list(text = "gemini ok")))))), "gemini"), "gemini ok"))
+stopifnot(identical(ai_extract_text(list(content = list(list(type = "text", text = "claude ok"))), "anthropic"), "claude ok"))
 parsed <- ai_extract_json("```json\n{\"parameters\":{\"k\":3},\"explanation\":\"测试\"}\n```")
 stopifnot(identical(parsed$parameters$k, 3L), identical(parsed$explanation, "测试"))
 
