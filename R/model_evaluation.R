@@ -171,6 +171,7 @@ model_evaluation_ui <- function(id) {
 
 model_evaluation_server <- function(id, result, directory = reactive(getwd()), model_label = "模型") {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     output$content <- renderUI({
       fitted <- result()
       if (is.null(fitted)) return(tags$div(class = "model-evaluation-note", "运行模型后，这里会显示统一口径的测试集评估。"))

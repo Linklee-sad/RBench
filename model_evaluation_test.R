@@ -43,6 +43,10 @@ result <- reactiveVal(list(task = "classification", actual = actual,
   probabilities = probabilities))
 testServer(model_evaluation_server, args = list(result = result,
   directory = reactive(test_directory), model_label = "测试模型"), {
+  session$flushReact()
+  evaluation_ui <- htmltools::renderTags(output$content)$html
+  stopifnot(nzchar(evaluation_ui), grepl("指标总览", evaluation_ui, fixed = TRUE),
+    grepl("positive_class", evaluation_ui, fixed = TRUE))
   session$setInputs(positive_class = "是", threshold = 0.85)
   stopifnot(evaluation()$binary, evaluation()$threshold == 0.85,
     identical(evaluation()$positive_class, "是"))
