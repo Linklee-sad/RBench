@@ -300,7 +300,7 @@ regression_server <- function(id, data, directory = reactive(getwd()), ai_config
     output$report <- renderText({ req(result()); result()$report })
     ai_report_server("ai_report", ai_config, "线性回归",
       reactive(if (is.null(result())) "" else result()$report),
-      reactive(if (is.null(result())) NULL else ai_model_context("线性回归", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("线性回归", result())), data)
     output$coefficients <- DT::renderDT({
       req(result())
       DT::formatSignif(DT::datatable(result()$coefficients, rownames = FALSE, escape = TRUE,

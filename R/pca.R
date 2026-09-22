@@ -217,7 +217,7 @@ pca_server <- function(id, data, directory = reactive(getwd()), ai_config = reac
     output$report <- renderText({ req(result()); result()$report })
     ai_report_server("ai_report", ai_config, "主成分分析（PCA）",
       reactive(if (is.null(result())) "" else result()$report),
-      reactive(if (is.null(result())) NULL else ai_model_context("主成分分析（PCA）", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("主成分分析（PCA）", result())), data)
     output$variance <- DT::renderDT({ req(result()); DT::datatable(result()$variance, rownames = FALSE, options = list(dom = "t", scrollX = TRUE)) })
     output$loadings <- DT::renderDT({ req(result()); DT::datatable(result()$loadings, rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE)) })
     output$scores <- DT::renderDT({ req(result()); DT::datatable(result()$scores, rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE)) })

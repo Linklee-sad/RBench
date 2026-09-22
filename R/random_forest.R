@@ -1,5 +1,6 @@
 if (!exists("ai_report_ui", mode = "function")) source("R/ai.R")
 if (!exists("rf_tutorial_ui", mode = "function")) source("R/random_forest_tutorial.R")
+if (!exists("model_evaluation_ui", mode = "function")) source("R/model_evaluation.R")
 
 rf_number <- function(x) {
   if (!length(x) || !is.finite(x)) return("无法计算")
@@ -107,6 +108,9 @@ fit_random_forest <- function(data, outcome, predictors, task = "auto", train_ra
   model <- randomForest::randomForest(x = train[-1], y = train$outcome, ntree = ntree,
     mtry = mtry, importance = TRUE, na.action = na.fail)
   prediction <- stats::predict(model, newdata = test[-1])
+  probabilities <- if (prepared$task == "classification") {
+    stats::predict(model, newdata = test[-1], type = "prob")
+  } else NULL
 
   importance_matrix <- randomForest::importance(model)
   permutation_column <- if ("MeanDecreaseAccuracy" %in% colnames(importance_matrix)) "MeanDecreaseAccuracy" else colnames(importance_matrix)[1]
@@ -149,6 +153,9 @@ fit_random_forest <- function(data, outcome, predictors, task = "auto", train_ra
       数值 = c(accuracy, balanced, 1 - oob_error), check.names = FALSE)
     predictions <- data.frame(原始行号 = prepared$valid_rows[split$test], 实际类别 = as.character(actual),
       预测类别 = as.character(prediction), 是否正确 = actual == prediction, check.names = FALSE)
+    probability_table <- as.data.frame(probabilities, check.names = FALSE)
+    names(probability_table) <- paste0("概率_", names(probability_table))
+    predictions <- data.frame(predictions, probability_table, check.names = FALSE)
     headline <- paste0("测试集准确率 = ", rf_number(accuracy), "，平衡准确率 = ", rf_number(balanced), "。")
     oob <- paste0("袋外（OOB）准确率 = ", rf_number(1 - oob_error), "。")
   }
@@ -176,6 +183,7 @@ fit_random_forest <- function(data, outcome, predictors, task = "auto", train_ra
     report = paste(report, collapse = "\n\n"), used = nrow(d), excluded = prepared$excluded,
     train_n = nrow(train), test_n = nrow(test), actual = actual, predicted = prediction,
     confusion = if (prepared$task == "classification") confusion else NULL,
+    probabilities = probabilities,
     analysis_summary = analysis_summary)
 }
 
@@ -230,8 +238,7 @@ random_forest_ui <- function(id) {
     tabsetPanel(
       tabPanel("专业解读", tags$div(style = "white-space:pre-wrap;line-height:1.9", textOutput(ns("report")))),
       tabPanel("AI 增强解读", ai_report_ui(ns("ai_report"))),
-      tabPanel("模型评估", DT::DTOutput(ns("metrics")), DT::DTOutput(ns("details"))),
-      tabPanel("评估图（ggplot2）", ggplot_editor_ui(ns("evaluation_editor"), height = "500px")),
+      tabPanel("模型评估", model_evaluation_ui(ns("unified_evaluation"))),
       tabPanel("变量重要性", DT::DTOutput(ns("importance")), ggplot_editor_ui(ns("importance_editor"), height = "520px")),
       tabPanel("测试集预测", DT::DTOutput(ns("predictions")))
     ), hr(),
@@ -296,7 +303,7 @@ random_forest_server <- function(id, data, directory = reactive(getwd()), ai_con
     output$report <- renderText({ req(result()); result()$report })
     ai_report_server("ai_report", ai_config, "随机森林",
       reactive(if (is.null(result())) "" else result()$report),
-      reactive(if (is.null(result())) NULL else ai_model_context("随机森林", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("随机森林", result())), data)
     output$metrics <- DT::renderDT({ req(result()); DT::datatable(result()$metrics, rownames = FALSE, options = list(dom = "t")) })
     output$details <- DT::renderDT({
       req(result())
@@ -305,10 +312,9 @@ random_forest_server <- function(id, data, directory = reactive(getwd()), ai_con
     })
     output$importance <- DT::renderDT({ req(result()); DT::datatable(result()$importance, rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE)) })
     output$predictions <- DT::renderDT({ req(result()); DT::datatable(result()$predictions, rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE)) })
-    evaluation_plot <- reactive({ req(result()); build_rf_evaluation_plot(result()) })
     importance_plot <- reactive({ req(result()); build_rf_importance_plot(result()) })
-    ggplot_editor_server("evaluation_editor", evaluation_plot, directory, "easyr-random-forest-evaluation")
     ggplot_editor_server("importance_editor", importance_plot, directory, "easyr-random-forest-importance")
+    model_evaluation_server("unified_evaluation", result, directory, "随机森林")
     write_report <- function(file) { req(result()); writeLines(enc2utf8(result()$report), file, useBytes = TRUE) }
     write_predictions <- function(file) {
       req(result()); con <- file(file, open = "wb"); on.exit(close(con)); writeBin(charToRaw("\ufeff"), con)

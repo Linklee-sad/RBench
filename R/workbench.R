@@ -290,6 +290,32 @@ convert_editor_column <- function(x, type) {
   result
 }
 
+bootstrap_expand_rows <- function(data, target_size, seed = 2026L, shuffle = FALSE) {
+  if (!is.data.frame(data) || ncol(data) < 1L) stop("当前数据必须是至少包含一个字段的数据表。", call. = FALSE)
+  current_size <- nrow(data)
+  if (current_size < 1L) stop("当前数据没有可供抽样的行。", call. = FALSE)
+  target_numeric <- suppressWarnings(as.numeric(target_size))
+  if (length(target_numeric) != 1L || !is.finite(target_numeric) || target_numeric != floor(target_numeric)) {
+    stop("目标行数必须是整数。", call. = FALSE)
+  }
+  if (target_numeric > 5000000 || target_numeric * ncol(data) > 50000000) {
+    stop("扩充结果最多为 5,000,000 行且不超过 50,000,000 个单元格。", call. = FALSE)
+  }
+  target_size <- as.integer(target_numeric)
+  if (target_size <= current_size) stop(paste0("目标行数必须大于当前的 ", current_size, " 行。"), call. = FALSE)
+  seed_numeric <- suppressWarnings(as.numeric(seed))
+  if (length(seed_numeric) != 1L || !is.finite(seed_numeric) || seed_numeric != floor(seed_numeric) ||
+      seed_numeric < 0 || seed_numeric > .Machine$integer.max) {
+    stop("随机种子必须是 0 到 2,147,483,647 之间的整数。", call. = FALSE)
+  }
+  set.seed(as.integer(seed_numeric))
+  added_indices <- sample.int(current_size, target_size - current_size, replace = TRUE)
+  result <- rbind(data, data[added_indices, , drop = FALSE])
+  if (isTRUE(shuffle)) result <- result[sample.int(nrow(result)), , drop = FALSE]
+  row.names(result) <- NULL
+  result
+}
+
 workbench_ui <- function(id) {
   ns <- NS(id)
   section <- function(title, icon_name, ...) {
@@ -333,6 +359,13 @@ workbench_ui <- function(id) {
           checkboxInput(ns("trim_text"), "去除文字首尾空格", TRUE),
           checkboxInput(ns("empty_to_na"), "把空字符串转换为缺失值 NA", TRUE),
           actionButton(ns("clean_text"), "应用文字清理", icon = icon("wand-magic-sparkles"), class = "btn-primary clean-action")
+        ),
+        section("Bootstrap 扩充样本", "copy",
+          p(class = "clean-tool-hint", "保留当前全部数据，再从现有行中有放回抽样，补足到目标行数。新增行会包含重复观测，不代表获得了新的独立信息。"),
+          numericInput(ns("bootstrap_target"), "目标总行数", 300, min = 2, max = 5000000, step = 100),
+          numericInput(ns("bootstrap_seed"), "随机种子", 2026, min = 0, max = .Machine$integer.max, step = 1),
+          checkboxInput(ns("bootstrap_shuffle"), "完成后随机打乱全部行", FALSE),
+          actionButton(ns("bootstrap_expand"), "执行 Bootstrap 扩充", icon = icon("copy"), class = "btn-primary clean-action")
         )
       ),
       tabPanel("② 筛选排序", value = "filter",
@@ -535,6 +568,8 @@ workbench_server <- function(id, original, directory = reactive(getwd()), datase
         selected = if (length(input$search_column) == 1L && input$search_column %in% unname(search_choices)) input$search_column else "0")
       current_row <- if (is.null(input$cell_row) || !length(input$cell_row) || is.na(input$cell_row)) 1L else input$cell_row
       updateNumericInput(session, "cell_row", max = max(1L, nrow(d)), value = min(max(1L, current_row), max(1L, nrow(d))))
+      suggested_target <- min(5000000L, max(nrow(d) + 1L, nrow(d) * 2L))
+      updateNumericInput(session, "bootstrap_target", min = nrow(d) + 1L, max = 5000000L, value = suggested_target)
     }, ignoreNULL = FALSE)
 
     output$missing_rules_status <- renderText({
@@ -567,6 +602,20 @@ workbench_server <- function(id, original, directory = reactive(getwd()), datase
         result <- normalize_text_fields(current, input$text_columns, isTRUE(input$trim_text), isTRUE(input$empty_to_na))
         commit_edit(result, paste0("文字清理完成：已处理 ", length(input$text_columns), " 个字段。"), current)
       }, error = function(e) { edit_status(paste0("文字清理失败：", conditionMessage(e))); showNotification(conditionMessage(e), type = "error") })
+    })
+
+    observeEvent(input$bootstrap_expand, {
+      tryCatch({
+        current <- isolate(data())
+        result <- bootstrap_expand_rows(current, input$bootstrap_target, input$bootstrap_seed,
+          isTRUE(input$bootstrap_shuffle))
+        added <- nrow(result) - nrow(current)
+        commit_edit(result, paste0("Bootstrap 扩充完成：保留原有 ", nrow(current), " 行，新增 ", added,
+          " 行；当前共 ", nrow(result), " 行。"), current)
+      }, error = function(e) {
+        edit_status(paste0("Bootstrap 扩充失败：", conditionMessage(e)))
+        showNotification(conditionMessage(e), type = "error", duration = 10)
+      })
     })
 
     observeEvent(input$apply_condition, {

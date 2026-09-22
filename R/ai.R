@@ -3,6 +3,8 @@ ai_provider_defaults <- function(provider = "openai") {
     openai = list(endpoint = "https://api.openai.com/v1/responses", model = "gpt-5.6-terra", protocol = "responses"),
     deepseek = list(endpoint = "https://api.deepseek.com/chat/completions", model = "deepseek-chat", protocol = "chat"),
     qwen = list(endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model = "qwen-plus", protocol = "chat"),
+    gemini = list(endpoint = "https://generativelanguage.googleapis.com/v1beta/models", model = "gemini-3.8-flash", protocol = "gemini"),
+    claude = list(endpoint = "https://api.anthropic.com/v1/messages", model = "claude-sonnet-5", protocol = "anthropic"),
     custom = list(endpoint = "", model = "", protocol = "chat")
   )
   presets[[provider]] %||% presets$custom
@@ -13,6 +15,8 @@ ai_provider_models <- function(provider = "openai") {
     openai = c("gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-6-astra", "gpt-5.5"),
     deepseek = c("deepseek-chat", "deepseek-reasoner"),
     qwen = c("qwen-plus", "qwen3.7-plus", "qwen3.8-max", "qwen3.8-flash", "qwen-flash", "qwen-max"),
+    gemini = c("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"),
+    claude = c("claude-sonnet-5", "claude-fable-5", "claude-opus-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"),
     custom = character(), character()
   )
 }
@@ -27,7 +31,7 @@ ai_local_config_path <- function() {
 
 ai_local_config_fields <- function(config) {
   provider <- as.character(config$provider %||% "openai")[1]
-  if (!provider %in% c("openai", "deepseek", "qwen", "custom")) stop("供应商设置无效。", call. = FALSE)
+  if (!provider %in% c("openai", "deepseek", "qwen", "gemini", "claude", "custom")) stop("供应商设置无效。", call. = FALSE)
   list(version = 1L, provider = provider,
     model = as.character(config$model %||% "")[1],
     endpoint = as.character(config$endpoint %||% "")[1],
@@ -56,7 +60,7 @@ ai_read_local_config <- function(path = ai_local_config_path()) {
   tryCatch({
     value <- jsonlite::fromJSON(path, simplifyVector = TRUE)
     value <- ai_local_config_fields(value)
-    if (!value$protocol %in% c("chat", "responses")) stop("协议无效。")
+    if (!value$protocol %in% c("chat", "responses", "gemini", "anthropic")) stop("协议无效。")
     value
   }, error = function(e) NULL)
 }
@@ -169,6 +173,20 @@ ai_dataset_profile <- function(data, include_sample = FALSE, sample_rows = 5L) {
     profile$sample_rows <- sample
   }
   jsonlite::toJSON(profile, auto_unbox = TRUE, pretty = TRUE, na = "null", dataframe = "rows")
+}
+
+ai_include_sample <- function(config) {
+  is.list(config) && (isTRUE(config$include_head) || identical(config$data_mode, "sample"))
+}
+
+ai_sample_rows <- function(config) {
+  value <- suppressWarnings(as.integer(config$head_rows %||% 5L))
+  if (!length(value) || is.na(value)) value <- 5L
+  max(1L, min(value, 10L))
+}
+
+ai_profile_for_config <- function(data, config) {
+  ai_dataset_profile(data, include_sample = ai_include_sample(config), sample_rows = ai_sample_rows(config))
 }
 
 # A detailed aggregate-only profile for AI interpretation. It contains no
@@ -381,9 +399,20 @@ ai_context_json <- function(context) {
     dataframe = "rows", na = "null", null = "null", digits = 10)
 }
 
-ai_clean_endpoint <- function(endpoint, protocol = "chat") {
+ai_clean_endpoint <- function(endpoint, protocol = "chat", model = NULL) {
   endpoint <- sub("/+$", "", trimws(endpoint %||% ""))
   if (!nzchar(endpoint)) return(endpoint)
+  if (identical(protocol, "gemini")) {
+    if (grepl(":generateContent$", endpoint)) return(endpoint)
+    model <- sub("^models/", "", trimws(model %||% ""))
+    if (!nzchar(model)) return(endpoint)
+    if (!grepl("/models$", endpoint)) endpoint <- paste0(endpoint, "/models")
+    return(paste0(endpoint, "/", model, ":generateContent"))
+  }
+  if (identical(protocol, "anthropic")) {
+    if (grepl("/messages$", endpoint)) return(endpoint)
+    return(paste0(endpoint, "/messages"))
+  }
   if (grepl("/(responses|chat/completions)$", endpoint)) return(endpoint)
   paste0(endpoint, if (identical(protocol, "responses")) "/responses" else "/chat/completions")
 }
@@ -398,6 +427,17 @@ ai_extract_text <- function(body, protocol = "chat") {
     }), use.names = FALSE)
     texts <- texts[nzchar(texts)]
     if (length(texts)) return(paste(texts, collapse = "\n"))
+  } else if (identical(protocol, "gemini")) {
+    candidates <- body$candidates %||% list()
+    parts <- if (length(candidates)) candidates[[1]]$content$parts %||% list() else list()
+    texts <- unlist(lapply(parts, function(part) part$text %||% ""), use.names = FALSE)
+    texts <- texts[nzchar(texts)]
+    if (length(texts)) return(paste(texts, collapse = "\n"))
+  } else if (identical(protocol, "anthropic")) {
+    content <- body$content %||% list()
+    texts <- unlist(lapply(content, function(part) if (identical(part$type %||% "", "text")) part$text %||% "" else ""), use.names = FALSE)
+    texts <- texts[nzchar(texts)]
+    if (length(texts)) return(paste(texts, collapse = "\n"))
   } else {
     text <- body$choices[[1]]$message$content %||% ""
     if (is.character(text) && nzchar(text)) return(text)
@@ -406,21 +446,41 @@ ai_extract_text <- function(body, protocol = "chat") {
   stop(message, call. = FALSE)
 }
 
+ai_auth_headers <- function(api_key, protocol = "chat") {
+  headers <- list(`Content-Type` = "application/json")
+  key <- trimws(api_key %||% "")
+  if (!nzchar(key)) return(headers)
+  if (identical(protocol, "gemini")) headers$`x-goog-api-key` <- key
+  else if (identical(protocol, "anthropic")) {
+    headers$`x-api-key` <- key
+    headers$`anthropic-version` <- "2023-06-01"
+  } else headers$Authorization <- paste("Bearer", key)
+  headers
+}
+
 ai_call <- function(config, system_prompt, user_prompt, max_tokens = 1600L, transport = NULL) {
   if (!ai_config_ready(config)) stop("请先在“AI 设置”页填写 API、模型和密钥。", call. = FALSE)
   protocol <- config$protocol %||% "chat"
-  endpoint <- ai_clean_endpoint(config$endpoint, protocol)
+  endpoint <- ai_clean_endpoint(config$endpoint, protocol, config$model)
   payload <- if (identical(protocol, "responses")) {
     list(model = config$model, instructions = system_prompt, input = user_prompt,
       max_output_tokens = as.integer(max_tokens), store = FALSE)
+  } else if (identical(protocol, "gemini")) {
+    list(
+      system_instruction = list(parts = list(list(text = system_prompt))),
+      contents = list(list(role = "user", parts = list(list(text = user_prompt)))),
+      generationConfig = list(maxOutputTokens = as.integer(max_tokens))
+    )
+  } else if (identical(protocol, "anthropic")) {
+    list(model = config$model, system = system_prompt, max_tokens = as.integer(max_tokens),
+      messages = list(list(role = "user", content = user_prompt)))
   } else {
     list(model = config$model, messages = list(
       list(role = "system", content = system_prompt), list(role = "user", content = user_prompt)
     ), max_tokens = as.integer(max_tokens), stream = FALSE)
   }
   if (is.function(transport)) return(transport(endpoint, config$api_key, payload, protocol))
-  request <- httr2::request(endpoint) |> httr2::req_headers(`Content-Type` = "application/json")
-  if (nzchar(trimws(config$api_key %||% ""))) request <- httr2::req_headers(request, Authorization = paste("Bearer", config$api_key))
+  request <- do.call(httr2::req_headers, c(list(httr2::request(endpoint)), ai_auth_headers(config$api_key, protocol)))
   request <- request |> httr2::req_body_json(payload, auto_unbox = TRUE) |>
     httr2::req_timeout(120) |>
     httr2::req_error(is_error = function(resp) FALSE)
@@ -441,13 +501,43 @@ ai_system_prompt <- function(language = "zh") paste(
   "如果信息不足，请指出需要补充的内容。除非明确要求 JSON，否则使用 Markdown 标题、列表和表格组织报告，不要输出原始 HTML。"
 )
 
+ai_provider_character_ui <- function(ns) {
+  character_card <- function(image = NULL, alt, provider_class, icon_name = "robot") {
+    tags$div(class = paste("ai-character-card", provider_class), role = "img", `aria-label` = alt,
+      if (is.null(image))
+        tags$div(class = "ai-character-placeholder", icon(icon_name))
+      else
+        tags$img(class = "ai-character-image", src = image, alt = alt)
+    )
+  }
+  tags$div(class = "ai-provider-character-stage",
+    conditionalPanel(sprintf("input['%s'] === 'openai'", ns("provider")),
+      character_card("ai-characters/chatgpt.png", "ChatGPT 卡通形象", "ai-character-openai")),
+    conditionalPanel(sprintf("input['%s'] === 'deepseek'", ns("provider")),
+      character_card("ai-characters/deepseek.png", "DeepSeek 卡通形象", "ai-character-deepseek")),
+    conditionalPanel(sprintf("input['%s'] === 'gemini'", ns("provider")),
+      character_card("ai-characters/gemini.png", "Gemini 卡通形象", "ai-character-gemini")),
+    conditionalPanel(sprintf("input['%s'] === 'claude'", ns("provider")),
+      character_card("ai-characters/claude.png", "Claude 卡通形象", "ai-character-claude")),
+    conditionalPanel(sprintf("input['%s'] === 'qwen'", ns("provider")),
+      character_card("ai-characters/qwen.png", "通义千问卡通形象", "ai-character-qwen")),
+    conditionalPanel(sprintf("input['%s'] === 'custom'", ns("provider")),
+      character_card("ai-characters/custom.png", "第三方 AI 卡通形象", "ai-character-custom"))
+  )
+}
+
 ai_settings_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    h3("AI 设置"),
-    p("选择供应商、模型并填写 API 密钥。第三方兼容服务还可以自行填写 API URL。默认只在当前会话中使用。"),
+    tags$div(class = "ai-settings-hero",
+      tags$div(class = "ai-settings-intro",
+        h3("AI 设置"),
+        p("选择供应商、模型并填写 API 密钥。第三方兼容服务还可以自行填写 API URL。默认只在当前会话中使用。")
+      ),
+      ai_provider_character_ui(ns)
+    ),
     fluidRow(
-      column(4, selectInput(ns("provider"), "供应商", c("OpenAI" = "openai", "DeepSeek" = "deepseek", "通义千问 / Qwen" = "qwen", "第三方供应商" = "custom"))),
+      column(4, selectInput(ns("provider"), "供应商", c("OpenAI" = "openai", "DeepSeek" = "deepseek", "Google Gemini" = "gemini", "Anthropic Claude" = "claude", "通义千问 / Qwen" = "qwen", "第三方供应商" = "custom"))),
       column(4, selectizeInput(ns("model"), "模型名称（可直接输入）", choices = ai_provider_models("openai"), selected = ai_provider_defaults("openai")$model,
         options = list(create = TRUE, persist = FALSE))),
       column(4, passwordInput(ns("api_key"), "API 密钥", placeholder = "仅保存在当前会话；本地接口可留空"))
@@ -458,6 +548,14 @@ ai_settings_ui <- function(id) {
         column(4, selectInput(ns("protocol"), "接口协议", c("OpenAI Chat Completions" = "chat", "OpenAI Responses" = "responses")))
       )),
     helpText("内置供应商会自动配置 URL 和协议；模型列表可以直接选择，也可以输入供应商账户可用的其他模型 ID。第三方接口需兼容 OpenAI Chat Completions 或 Responses。默认只发送字段结构和统计摘要。"),
+    tags$div(class = "ai-local-config",
+      h4(icon("table-list"), " 发送给 AI 的数据范围"),
+      checkboxInput(ns("include_head"), "允许 AI 查看当前数据集的前几行（head）", FALSE),
+      conditionalPanel(sprintf("input['%s']", ns("include_head")),
+        sliderInput(ns("head_rows"), "发送前几行", min = 1, max = 10, value = 5, step = 1)
+      ),
+      p(class = "ai-local-note", "默认关闭。开启后，数据顾问、AI 参数推荐和 AI 报告会在统计摘要之外发送当前数据集的前几行，帮助 AI 理解字段格式和实际取值。疑似姓名、电话、邮箱、账号、密码等字段会自动隐藏样例值。")
+    ),
     tags$div(class = "ai-local-config",
       h4(icon("hard-drive"), " 本地保存"),
       checkboxInput(ns("allow_local_save"), "我选择将当前 AI 连接配置保存在这台电脑上", FALSE),
@@ -475,7 +573,8 @@ ai_settings_ui <- function(id) {
     tags$ul(
       tags$li("默认不会保存 API Key；只有勾选并点击“保存到本机”才会创建本地配置文件。"),
       tags$li("本地配置位于当前用户的系统配置目录，不在 EasyR 项目和 GitHub 仓库中。"),
-      tags$li("只发送字段名、类型、缺失数量和汇总统计，不发送原始数据行。"),
+      tags$li("默认只发送字段名、类型、缺失数量和汇总统计。只有主动开启 head 选项后，才会附加所选数量的前几行。"),
+      tags$li("样例行中的疑似姓名、电话、邮箱、地址、账号、密码等字段会自动隐藏；发送前仍应检查预览内容。"),
       tags$li("设置页不会要求姓名、邮箱、手机号、账号或其他个人资料。"),
       tags$li("每次发送都需要在相应页面勾选确认，并可先查看发送内容。")
     )
@@ -528,7 +627,9 @@ ai_settings_server <- function(id, config_path = ai_local_config_path()) {
       list(provider = provider, endpoint = if (custom) trimws(input$endpoint %||% "") else preset$endpoint,
         model = trimws(input$model %||% preset$model), api_key = input$api_key %||% "",
         protocol = if (custom) input$protocol %||% "chat" else preset$protocol,
-        data_mode = "summary", language = "zh", max_tokens = 4000L)
+        data_mode = if (isTRUE(input$include_head)) "sample" else "summary",
+        include_head = isTRUE(input$include_head), head_rows = ai_sample_rows(list(head_rows = input$head_rows)),
+        language = "zh", max_tokens = 4000L)
     })
     output$config_location <- renderText({ paste0("配置位置：", config_path) })
     observeEvent(input$save_local, {
@@ -568,7 +669,7 @@ ai_data_advisor_ui <- function(id) {
     textAreaInput(ns("goal"), "分析目标", rows = 3, placeholder = "例如：预测下个月销售额，并找出最重要的影响因素"),
     textAreaInput(ns("meanings"), "变量含义（可选）", rows = 4, placeholder = "例如：sales=月销售额；ad_spend=广告投入；region=地区"),
     selectInput(ns("focus"), "希望 AI 重点回答", c("完整分析路线" = "workflow", "数据清洗" = "cleaning", "算法选择" = "algorithm", "算法参数推荐" = "parameters")),
-    checkboxInput(ns("confirm"), "我已查看发送内容，并同意把所示摘要发送给所选 AI 供应商", FALSE),
+    checkboxInput(ns("confirm"), "我已查看发送内容，并同意把所示数据发送给所选 AI 供应商", FALSE),
     actionButton(ns("preview"), "查看发送内容"),
     actionButton(ns("ask"), "让 AI 分析", class = "btn-primary"),
     downloadButton(ns("download"), "下载 AI 建议 Markdown"),
@@ -586,7 +687,7 @@ ai_data_advisor_server <- function(id, data, config) {
     pager <- ai_pager_server(input, output, answer)
     payload <- reactive({
       req(data())
-      ai_dataset_profile(data(), include_sample = identical(config()$data_mode, "sample"))
+      ai_profile_for_config(data(), config())
     })
     output$payload <- renderText(payload())
     observeEvent(input$ask, {
@@ -618,10 +719,10 @@ ai_report_ui <- function(id) {
     textAreaInput(ns("goal"), "本次分析目的", rows = 2),
     textAreaInput(ns("meanings"), "变量含义与业务背景（可选）", rows = 3),
     textAreaInput(ns("question"), "希望 AI 重点解释的问题（可选）", rows = 2),
-    checkboxInput(ns("confirm"), "我同意把本页已有的模型结果、完整计算摘要和上述文字发送给所选 AI 供应商", FALSE),
+    checkboxInput(ns("confirm"), "我同意把预览中显示的模型结果、计算数据和上述文字发送给所选 AI 供应商", FALSE),
     tags$details(class = "ai-report-payload",
       tags$summary(icon("table-list"), " 查看将发送给 AI 的完整计算数据"),
-      p("这里包含汇总统计和模型计算结果，不包含逐行原始数据。过大的表格会保留总行数并截取前 100 行。"),
+      p(textOutput(ns("sharing_note"))),
       tags$pre(style = "max-height:420px;overflow:auto;white-space:pre-wrap;background:#fff;border:1px solid #dbe3ee;padding:12px", textOutput(ns("computed_preview")))
     ),
     actionButton(ns("generate"), "生成 AI 增强报告", class = "btn-primary"),
@@ -632,14 +733,30 @@ ai_report_ui <- function(id) {
   )
 }
 
-ai_report_server <- function(id, config, algorithm, local_report, computed_context = reactive(NULL)) {
+ai_report_server <- function(id, config, algorithm, local_report, computed_context = reactive(NULL), source_data = reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     answer <- reactiveVal(""); status <- reactiveVal("请先运行模型。")
     pager <- ai_pager_server(input, output, answer)
     context_json <- reactive({
       context <- computed_context()
       if (is.null(context)) return("{}")
+      current_config <- config()
+      if (ai_include_sample(current_config)) {
+        dataset <- source_data()
+        if (!is.null(dataset)) {
+          context$dataset_profile_with_head <- jsonlite::fromJSON(
+            ai_profile_for_config(dataset, current_config), simplifyVector = FALSE)
+        }
+      }
       ai_context_json(context)
+    })
+    output$sharing_note <- renderText({
+      if (ai_include_sample(config())) {
+        paste0("这里包含汇总统计、模型计算结果和数据集前 ", ai_sample_rows(config()),
+          " 行。疑似敏感字段的样例值会自动隐藏；过大的计算表格会保留总行数并截取前 100 行。")
+      } else {
+        "这里包含汇总统计和模型计算结果，不包含逐行原始数据。过大的计算表格会保留总行数并截取前 100 行。"
+      }
     })
     output$computed_preview <- renderText({
       report <- local_report()
@@ -688,7 +805,11 @@ ai_parameter_ui <- function(id) {
       tags$summary(icon("wand-magic-sparkles"), tags$span("AI 推荐参数"), tags$span(class = "ai-parameter-badge", "AI")),
       p("AI 会参考当前数据规模、字段和参数范围提出建议。应用前会先显示建议，不会自动运行模型。"),
       textInput(ns("goal"), "建模目标（可选）"),
-      checkboxInput(ns("confirm"), "我同意把数据摘要和当前参数发送给所选 AI 供应商", FALSE),
+      checkboxInput(ns("confirm"), "我同意把预览中显示的数据和当前参数发送给所选 AI 供应商", FALSE),
+      tags$details(class = "ai-report-payload",
+        tags$summary(icon("table-list"), " 查看将发送给 AI 的数据"),
+        tags$pre(style = "max-height:300px;overflow:auto;white-space:pre-wrap;background:#fff;border:1px solid #dbe3ee;padding:12px", textOutput(ns("payload_preview")))
+      ),
       actionButton(ns("recommend"), "生成参数建议", icon = icon("wand-magic-sparkles"), class = "btn-primary ai-recommend-button"),
       tags$div(style = "margin:8px 0", textOutput(ns("status"))),
       tags$pre(class = "ai-parameter-proposal", textOutput(ns("proposal_text"))),
@@ -700,6 +821,11 @@ ai_parameter_ui <- function(id) {
 ai_parameter_server <- function(id, config, data, algorithm, current_parameters, constraints) {
   moduleServer(id, function(input, output, session) {
     proposal <- reactiveVal(NULL); status <- reactiveVal("")
+    profile <- reactive({
+      if (is.null(data())) return("请先导入数据。")
+      ai_profile_for_config(data(), config())
+    })
+    output$payload_preview <- renderText(profile())
     observeEvent(input$recommend, {
       if (is.null(data())) { status("请先导入数据。") ; return() }
       if (!isTRUE(input$confirm)) { status("请先勾选同意发送摘要。") ; return() }
@@ -707,7 +833,7 @@ ai_parameter_server <- function(id, config, data, algorithm, current_parameters,
       prompt <- paste0("请为 ", algorithm, " 推荐参数。建模目标：", input$goal %||% "未提供",
         "\n当前参数：", jsonlite::toJSON(current_parameters(), auto_unbox = TRUE),
         "\n允许的参数及范围：", jsonlite::toJSON(constraints, auto_unbox = TRUE),
-        "\n数据摘要：\n<dataset_profile>\n", ai_dataset_profile(data(), FALSE), "\n</dataset_profile>\n",
+        "\n数据摘要：\n<dataset_profile>\n", profile(), "\n</dataset_profile>\n",
         "只返回 JSON，格式为 {\"parameters\":{...},\"explanation\":\"...\"}。所有参数必须在给定范围内；不要返回未列出的参数。")
       tryCatch({
         parsed <- ai_extract_json(ai_call(config(), ai_system_prompt(config()$language), prompt, min(config()$max_tokens, 1000L)))

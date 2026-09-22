@@ -1,5 +1,6 @@
 if (!exists("ai_report_ui", mode = "function")) source("R/ai.R")
 if (!exists("algorithm_title_ui", mode = "function")) source("R/algorithm_tutorials.R")
+if (!exists("model_evaluation_ui", mode = "function")) source("R/model_evaluation.R")
 
 svm_number <- function(x) {
   if (!length(x) || !is.finite(x)) return("无法计算")
@@ -100,8 +101,10 @@ fit_svm_analysis <- function(data, outcome, predictors, task = "auto", train_rat
   model <- e1071::svm(x = x_train, y = y_train,
     type = if (prepared$task == "classification") "C-classification" else "eps-regression",
     kernel = kernel, cost = cost, gamma = effective_gamma, degree = degree,
-    coef0 = coef0, epsilon = epsilon, scale = isTRUE(scale), probability = FALSE)
-  prediction <- stats::predict(model, x_test)
+    coef0 = coef0, epsilon = epsilon, scale = isTRUE(scale),
+    probability = prepared$task == "classification")
+  prediction <- stats::predict(model, x_test, probability = prepared$task == "classification")
+  probabilities <- if (prepared$task == "classification") attr(prediction, "probabilities") else NULL
 
   if (prepared$task == "regression") {
     actual <- as.numeric(y_test); predicted <- as.numeric(prediction); residual <- actual - predicted
@@ -128,6 +131,9 @@ fit_svm_analysis <- function(data, outcome, predictors, task = "auto", train_rat
     metrics <- data.frame(指标 = c("测试集准确率", "测试集平衡准确率"), 数值 = c(accuracy, balanced), check.names = FALSE)
     predictions <- data.frame(原始行号 = prepared$valid_rows[split$test], 实际类别 = as.character(actual),
       预测类别 = as.character(predicted), 是否正确 = actual == predicted, check.names = FALSE)
+    probability_table <- as.data.frame(probabilities, check.names = FALSE)
+    names(probability_table) <- paste0("概率_", names(probability_table))
+    predictions <- data.frame(predictions, probability_table, check.names = FALSE)
     headline <- paste0("测试集准确率 = ", svm_number(accuracy), "，平衡准确率 = ", svm_number(balanced), "。")
   }
   support_count <- nrow(model$SV)
@@ -157,7 +163,7 @@ fit_svm_analysis <- function(data, outcome, predictors, task = "auto", train_rat
     metrics = metrics, details = details, predictions = predictions, support = support_table,
     report = paste(report, collapse = "\n\n"), used = length(prepared$y), excluded = prepared$excluded,
     train_n = length(split$train), test_n = length(split$test), actual = actual, predicted = predicted,
-    confusion = confusion, analysis_summary = analysis_summary)
+    confusion = confusion, probabilities = probabilities, analysis_summary = analysis_summary)
 }
 
 build_svm_evaluation_plot <- function(result) {
@@ -202,8 +208,7 @@ svm_ui <- function(id) {
     tabsetPanel(
       tabPanel("专业解读", tags$div(style = "white-space:pre-wrap;line-height:1.9", textOutput(ns("report")))),
       tabPanel("AI 增强解读", ai_report_ui(ns("ai_report"))),
-      tabPanel("模型评估", DT::DTOutput(ns("metrics")), DT::DTOutput(ns("details"))),
-      tabPanel("评估图（ggplot2）", ggplot_editor_ui(ns("evaluation_editor"), height = "500px")),
+      tabPanel("模型评估", model_evaluation_ui(ns("unified_evaluation"))),
       tabPanel("支持向量", DT::DTOutput(ns("support"))),
       tabPanel("测试集预测", DT::DTOutput(ns("predictions")))
     ), hr(),
@@ -268,13 +273,12 @@ svm_server <- function(id, data, directory = reactive(getwd()), ai_config = reac
     output$status <- renderText(status()); output$report <- renderText({ req(result()); result()$report })
     ai_report_server("ai_report", ai_config, "支持向量机（SVM）",
       reactive(if (is.null(result())) "" else result()$report),
-      reactive(if (is.null(result())) NULL else ai_model_context("支持向量机（SVM）", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("支持向量机（SVM）", result())), data)
     output$metrics <- DT::renderDT({ req(result()); DT::datatable(result()$metrics, rownames = FALSE, options = list(dom = "t")) })
     output$details <- DT::renderDT({ req(result()); DT::datatable(result()$details, rownames = FALSE, options = list(pageLength = 20, scrollX = TRUE)) })
     output$support <- DT::renderDT({ req(result()); DT::datatable(result()$support, rownames = FALSE, options = list(dom = "t")) })
     output$predictions <- DT::renderDT({ req(result()); DT::datatable(result()$predictions, rownames = FALSE, options = list(pageLength = 15, scrollX = TRUE)) })
-    evaluation_plot <- reactive({ req(result()); build_svm_evaluation_plot(result()) })
-    ggplot_editor_server("evaluation_editor", evaluation_plot, directory, "easyr-svm-evaluation")
+    model_evaluation_server("unified_evaluation", result, directory, "支持向量机")
     write_report <- function(file) { req(result()); writeLines(enc2utf8(result()$report), file, useBytes = TRUE) }
     write_predictions <- function(file) {
       req(result()); con <- file(file, open = "wb"); on.exit(close(con)); writeBin(charToRaw("\ufeff"), con)

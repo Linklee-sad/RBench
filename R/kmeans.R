@@ -250,7 +250,7 @@ kmeans_server <- function(id, data, directory = reactive(getwd()), ai_config = r
     output$report <- renderText({ req(result()); result()$report })
     ai_report_server("ai_report", ai_config, "K-means 聚类",
       reactive(if (is.null(result())) "" else result()$report),
-      reactive(if (is.null(result())) NULL else ai_model_context("K-means 聚类", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("K-means 聚类", result())), data)
     output$quality <- DT::renderDT({ req(result()); DT::datatable(result()$quality, rownames = FALSE, options = list(dom = "t")) })
     output$summary <- DT::renderDT({ req(result()); DT::datatable(result()$summary, rownames = FALSE, options = list(dom = "t", scrollX = TRUE)) })
     output$centers_table <- DT::renderDT({ req(result()); DT::datatable(result()$centers, rownames = FALSE, options = list(scrollX = TRUE)) })

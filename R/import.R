@@ -42,6 +42,90 @@ format_file_size <- function(bytes) {
   paste0(format(round(bytes / 1024^power, if (power < 2) 0 else 1), trim = TRUE), " ", units[power + 1])
 }
 
+easyr_example_catalog <- function() {
+  list(
+    iris = list(
+      label = "鸢尾花 iris（分类 / 聚类 / PCA）",
+      name = "示例 · 鸢尾花 iris",
+      description = "150 行、4 个连续测量字段和 3 个品种，适合分类、聚类、PCA 与基础绘图。",
+      data = function() datasets::iris
+    ),
+    mtcars = list(
+      label = "汽车性能 mtcars（回归 / 机器学习）",
+      name = "示例 · 汽车性能 mtcars",
+      description = "32 款汽车的油耗、马力、重量等指标，适合线性回归、变量关系和机器学习。",
+      data = function() {
+        value <- datasets::mtcars
+        data.frame(Model = rownames(value), value, row.names = NULL, check.names = FALSE)
+      }
+    ),
+    boston = list(
+      label = "波士顿房价 Boston（回归 / 房价预测）",
+      name = "示例 · 波士顿房价 Boston",
+      description = "506 个地区的房价中位数及犯罪率、房间数、交通等 13 项特征，适合回归、特征分析和房价预测。",
+      data = function() as.data.frame(MASS::Boston, check.names = FALSE)
+    ),
+    titanic = list(
+      label = "泰坦尼克号 Titanic（分类 / 逻辑回归）",
+      name = "示例 · 泰坦尼克号 Titanic",
+      description = "2,201 名乘客的舱位、性别、年龄与生还结果，适合分类和逻辑回归。",
+      data = function() {
+        counts <- as.data.frame(datasets::Titanic)
+        value <- counts[rep(seq_len(nrow(counts)), counts$Freq), setdiff(names(counts), "Freq"), drop = FALSE]
+        rownames(value) <- NULL
+        value
+      }
+    ),
+    airquality = list(
+      label = "纽约空气质量 airquality（缺失值 / 回归）",
+      name = "示例 · 纽约空气质量 airquality",
+      description = "包含臭氧、太阳辐射、风速和温度，并保留真实缺失值，适合练习清洗和回归。",
+      data = function() datasets::airquality
+    ),
+    usarrests = list(
+      label = "美国州犯罪 USArrests（PCA / 聚类）",
+      name = "示例 · 美国州犯罪 USArrests",
+      description = "美国 50 个州的四项犯罪与城市化指标，适合标准化、PCA 和 K-means。",
+      data = function() {
+        value <- datasets::USArrests
+        data.frame(State = rownames(value), value, row.names = NULL, check.names = FALSE)
+      }
+    ),
+    airpassengers = list(
+      label = "航空乘客 AirPassengers（时间序列 / 预测）",
+      name = "示例 · 航空乘客 AirPassengers",
+      description = "1949—1960 年的月度航空乘客量，具有趋势和季节性，适合时间序列分析与预测。",
+      data = function() data.frame(
+        Date = seq(as.Date("1949-01-01"), by = "month", length.out = length(datasets::AirPassengers)),
+        Passengers = as.numeric(datasets::AirPassengers), check.names = FALSE
+      )
+    ),
+    swiss = list(
+      label = "瑞士社会经济 swiss（多元回归）",
+      name = "示例 · 瑞士社会经济 swiss",
+      description = "47 个地区的生育率和社会经济指标，适合相关分析与多元线性回归。",
+      data = function() {
+        value <- datasets::swiss
+        data.frame(Province = rownames(value), value, row.names = NULL, check.names = FALSE)
+      }
+    )
+  )
+}
+
+easyr_example_choices <- function() {
+  catalog <- easyr_example_catalog()
+  stats::setNames(names(catalog), vapply(catalog, `[[`, character(1), "label"))
+}
+
+easyr_example_dataset <- function(key = "iris") {
+  catalog <- easyr_example_catalog()
+  if (!length(key) || is.na(key) || !key %in% names(catalog)) key <- "iris"
+  spec <- catalog[[key]]
+  value <- spec$data()
+  if (!is.data.frame(value) || !nrow(value) || !ncol(value)) stop("示例数据集不可用。", call. = FALSE)
+  list(key = key, name = spec$name, description = spec$description, data = value)
+}
+
 validate_upload_size <- function(bytes, limit_mb) {
   limit_mb <- as.numeric(limit_mb)
   if (length(limit_mb) != 1 || !is.finite(limit_mb) || !limit_mb %in% c(100, 500, 1000)) {
@@ -89,7 +173,7 @@ dataset_bar_ui <- function(id) {
 import_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    h3("01 导入数据"),
+    h3("导入数据"),
     selectInput(ns("upload_limit"), "单个文件上传上限",
       c("100 MB" = "100", "500 MB（推荐）" = "500", "1000 MB" = "1000"), selected = "500"),
     fileInput(ns("file"), "选择一个或多个表格", accept = c(".csv", ".xlsx", ".xls"), multiple = TRUE,
@@ -100,7 +184,11 @@ import_ui <- function(id) {
     checkboxInput(ns("header"), "第一行是字段名", TRUE),
     uiOutput(ns("sheet_ui")),
     actionButton(ns("import"), "导入并加入数据集", class = "btn-primary"),
-    actionButton(ns("demo"), "试用示例"),
+    tags$div(class = "example-dataset-picker",
+      selectInput(ns("example_dataset"), "示例数据集", easyr_example_choices(), selected = "iris"),
+      actionButton(ns("demo"), "载入所选示例", icon = icon("flask")),
+      tags$div(class = "example-dataset-description", textOutput(ns("example_description")))
+    ),
     hr(), textOutput(ns("status")),
     helpText("可以一次选择多个 CSV。批量文件共用当前编码、分隔符和首行设置；Excel 请每次选择一个。取消“第一行是字段名”后，程序会自动生成字段名。表头中的空白字段也会自动命名；第一列为空时命名为“序号”。")
   )
@@ -111,7 +199,7 @@ import_server <- function(id) {
     datasets <- reactiveVal(list())
     active <- reactiveVal(NULL)
     revision <- reactiveVal(0L)
-    status <- reactiveVal("选择一个或多个 CSV，或点击“试用示例”开始。")
+    status <- reactiveVal("选择一个或多个 CSV，或从下方载入示例数据集。")
     refresh_choices <- function(selected = active()) {
       choices <- names(datasets())
       if (!length(selected) || !selected %in% choices) selected <- head(choices, 1)
@@ -192,9 +280,11 @@ import_server <- function(id) {
       })
     })
     observeEvent(input$demo, {
-      add_datasets(list("内置示例 iris" = iris))
-      status("已加入内置鸢尾花示例 iris。")
+      example <- easyr_example_dataset(input$example_dataset)
+      add_datasets(stats::setNames(list(example$data), example$name))
+      status(paste0("已加入", example$name, "。", example$description))
     })
+    output$example_description <- renderText(easyr_example_dataset(input$example_dataset)$description)
     observeEvent(input$active, {
       if (length(input$active) == 1 && input$active %in% names(datasets())) active(input$active)
     })

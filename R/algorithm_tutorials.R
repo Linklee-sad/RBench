@@ -12,6 +12,30 @@ algorithm_tutorial_lessons <- function(key) {
       list("第 5 步：检查模型假设", "重点检查线性关系、残差独立性、方差稳定性和强影响点。残差图出现曲线或漏斗形状时，应重新考虑变量形式。", "`eᵢ = yᵢ − ŷᵢ`", "正态性主要影响小样本推断，并不要求原始变量正态。"),
       list("第 6 步：评价与验证", "R²描述样本内解释比例，RMSE和MAE描述预测误差。预测用途应使用独立测试集、交叉验证或按时间划分。", "`RMSE = √[Σ(yᵢ − ŷᵢ)² / n]`", "不能只凭高 R² 判断模型可靠，更不能直接推出因果关系。")
     ),
+    logistic = list(
+      list("第 1 步：从二分类问题开始", "逻辑回归预测一个事件发生的概率，例如违约与否、患病与否。结果只有两个类别，并要明确哪一个是正类。", "`Y ∈ {0,1}`", "正类决定所有概率、系数和优势比的解释方向。"),
+      list("第 2 步：用 S 形曲线约束概率", "线性组合可以取任意数，逻辑函数把它转换到 0 和 1 之间，因此适合作为概率。", "`p(x) = 1 / [1 + exp(−(β₀ + β₁x))]`", "曲线中间变化最快，两端逐渐趋近 0 或 1。"),
+      list("第 3 步：理解 logit", "把概率换成优势 p/(1−p)，再取对数后，模型与预测变量形成线性关系。", "`log[p/(1−p)] = β₀ + β₁x`", "系数描述对数优势的变化，不是概率直接增加多少。"),
+      list("第 4 步：解释优势比", "系数取指数得到优势比 OR。OR 大于 1 表示正类优势提高，小于 1 表示正类优势降低。", "`OR = exp(β)`", "OR 是优势的倍数，不是概率的倍数。"),
+      list("第 5 步：选择分类阈值", "预测概率需要经过阈值才能变成类别。降低阈值通常能找出更多正类，但也会增加误报。", "`predict positive if p ≥ threshold`", "阈值应根据漏报和误报的实际代价选择。"),
+      list("第 6 步：评价模型", "混淆矩阵、Precision、Recall、F1 描述特定阈值下的表现；ROC AUC 描述模型跨阈值区分正负类的能力。", "`Recall = TP / (TP + FN)`", "类别不平衡时不要只看 Accuracy，还要检查概率校准和外部验证。")
+    ),
+    decision_tree = list(
+      list("第 1 步：从全部样本开始", "决策树从根节点开始，寻找一个条件把样本分成更纯、更容易预测的子组。", "`root node = all training observations`", "树使用训练数据学习分裂条件。"),
+      list("第 2 步：选择最佳分裂", "分类树寻找能最大程度降低类别混杂的字段和切点；回归树寻找能最大程度降低组内平方误差的分裂。", "`choose split with largest impurity reduction`", "分裂点由数据决定，可能随样本变化。"),
+      list("第 3 步：递归生长", "每个子节点继续重复分裂，形成可以表达非线性和变量交互的层级规则。", "`if condition → left child; else → right child`", "树越深，规则越细，训练拟合通常越高。"),
+      list("第 4 步：叶节点做预测", "无法或不再继续分裂的节点称为叶节点。分类使用叶节点的多数类别或类别比例，回归使用平均值。", "`prediction = leaf summary`", "叶节点样本过少时，预测通常不稳定。"),
+      list("第 5 步：限制复杂度与剪枝", "最大深度、最小分裂样本数和 cp 控制树的复杂度。剪枝删除收益有限的分支，减少过拟合。", "`larger cp ⇒ simpler tree`", "参数应根据验证表现选择，而不是追求训练集最优。"),
+      list("第 6 步：测试集验证", "用未参与训练的数据计算分类或回归指标。单棵树可解释，但通常比集成树更容易随样本波动。", "`generalization = performance on unseen data`", "同时检查树结构是否符合实际逻辑和数据采集过程。")
+    ),
+    advanced_regression = list(
+      list("第 1 步：从普通回归的局限出发", "预测变量高度相关或数量较多时，普通最小二乘系数可能大幅波动。非线性关系也需要显式加入高次项。", "`y = β₀ + β₁x + β₂x² + … + ε`", "先用图形和领域知识决定是否需要高次项与交互项。"),
+      list("第 2 步：加入多项式项", "平方项和三次项让模型描述弯曲关系，同时仍然保持对系数线性的回归结构。", "`features: x, x², x³`", "高次项可能导致外推极不稳定，应限制次数并检查预测范围。"),
+      list("第 3 步：加入交互项", "交互项表示一个变量的影响会随另一个变量改变。包含交互项时，主效应不再是孤立的总体平均影响。", "`y = β₀ + β₁x₁ + β₂x₂ + β₃x₁x₂`", "通常保留参与交互的主效应，以维持模型层级。"),
+      list("第 4 步：岭回归收缩系数", "岭回归对系数平方和施加惩罚，能缓解共线性并降低估计方差，但通常不会把系数压到严格的 0。", "`min RSS + λΣβⱼ²`", "λ 越大，系数收缩越强。"),
+      list("第 5 步：Lasso 筛选变量", "Lasso使用绝对值惩罚，可以把部分系数压到 0，从而得到更稀疏的模型。相关变量之间的选择可能不稳定。", "`min RSS + λΣ|βⱼ|`", "变量未入选不表示它与结果完全无关。"),
+      list("第 6 步：交叉验证选择 λ", "把训练数据分折，比较不同 λ 在未参与拟合的折上的误差。最低误差规则追求表现，1-SE规则偏向更简单的模型。", "`λ* = arg min CV error`", "最终测试集只能用于一次独立评价，不能反复用于调参。")
+    ),
     svm = list(
       list("第 1 步：寻找分隔边界", "支持向量机寻找能区分类别的超平面。二维中它是一条线，更高维中称为超平面。", "`f(x) = wᵀx + b`", "预测类别由 `f(x)` 的符号决定。"),
       list("第 2 步：最大化间隔", "模型不仅要分开类别，还希望边界到两侧最近样本的距离尽可能大，以提高泛化能力。", "`margin = 2 / ‖w‖`", "真正决定边界的是最靠近间隔的支持向量。"),
@@ -52,6 +76,9 @@ algorithm_tutorial_lessons <- function(key) {
 algorithm_tutorial_defaults <- function(key) {
   switch(key,
     regression = list(sample_n = 40L, slope = 1.5, noise = 2, outlier = FALSE),
+    logistic = list(sample_n = 100L, effect = 1.4, threshold = 0.5),
+    decision_tree = list(maxdepth = 3L, cp = .01, overlap = .6),
+    advanced_regression = list(correlation = .85, lambda = .3, curve = 1),
     svm = list(shape = "curved", kernel = "radial", cost = 1, gamma = 1),
     pca = list(correlation = .8, scale_ratio = 1, standardize = TRUE),
     kmeans = list(true_groups = 3L, centers = 3L, overlap = .55, standardize = TRUE),
@@ -70,6 +97,18 @@ algorithm_tutorial_parameters_ui <- function(ns, key) {
       column(3, sliderInput(ns("slope"), "真实斜率", -3, 3, 1.5, step = .25)),
       column(3, sliderInput(ns("noise"), "随机噪声", .2, 6, 2, step = .2)),
       column(3, checkboxInput(ns("outlier"), "加入一个异常点", FALSE))),
+    logistic = fluidRow(
+      column(4, sliderInput(ns("sample_n"), "样本量", 40, 240, 100, step = 20)),
+      column(4, sliderInput(ns("effect"), "关系强度", -3, 3, 1.4, step = .2)),
+      column(4, sliderInput(ns("threshold"), "分类阈值", .1, .9, .5, step = .05))),
+    decision_tree = fluidRow(
+      column(4, sliderInput(ns("maxdepth"), "最大深度", 1, 6, 3, step = 1)),
+      column(4, sliderInput(ns("cp"), "剪枝强度 cp", 0, .15, .01, step = .005)),
+      column(4, sliderInput(ns("overlap"), "类别重叠", .1, 1.5, .6, step = .1))),
+    advanced_regression = fluidRow(
+      column(4, sliderInput(ns("correlation"), "预测变量相关程度", 0, .98, .85, step = .05)),
+      column(4, sliderInput(ns("lambda"), "惩罚强度 λ", .001, 2, .3, step = .05)),
+      column(4, sliderInput(ns("curve"), "非线性强度", -2, 2, 1, step = .2))),
     svm = fluidRow(
       column(3, selectInput(ns("shape"), "数据形状", c("弯曲边界" = "curved", "近似线性" = "linear"))),
       column(3, selectInput(ns("kernel"), "核函数", c("RBF 径向基" = "radial", "线性核" = "linear"))),
@@ -121,7 +160,80 @@ algorithm_tutorial_plot <- function(key, step, parameters = algorithm_tutorial_d
     if (step == 2L) p <- p + ggplot2::geom_segment(ggplot2::aes(xend = x, yend = fit), colour = "#d97706", alpha = .7)
     return(p)
   }
-  if (key == "svm") {
+  if (key == "logistic") {
+    n <- as.integer(algorithm_tutorial_value(parameters, "sample_n", 100L))
+    effect <- as.numeric(algorithm_tutorial_value(parameters, "effect", 1.4))
+    threshold <- as.numeric(algorithm_tutorial_value(parameters, "threshold", .5))
+    x <- sort(stats::runif(n, -3, 3)); true_probability <- stats::plogis(-.25 + effect * x)
+    y <- stats::rbinom(n, 1, true_probability); d <- data.frame(x, y)
+    model <- stats::glm(y ~ x, data = d, family = stats::binomial())
+    grid <- data.frame(x = seq(-3.2, 3.2, length.out = 240)); grid$probability <- stats::predict(model, grid, type = "response")
+    if (step == 3L) {
+      grid$logit <- stats::qlogis(pmin(.999, pmax(.001, grid$probability)))
+      return(ggplot2::ggplot(grid, ggplot2::aes(x, logit)) + ggplot2::geom_line(colour = "#2563eb", linewidth = 1.1) + theme + ggplot2::labs(title = "logit 与 X 呈线性关系", x = "预测变量 X", y = "log[p/(1−p)]"))
+    }
+    if (step == 4L) {
+      estimate <- stats::coef(summary(model))["x", "Estimate"]
+      se <- stats::coef(summary(model))["x", "Std. Error"]
+      odds <- data.frame(item = "X 每增加 1", or = exp(estimate), low = exp(estimate - 1.96 * se), high = exp(estimate + 1.96 * se))
+      return(ggplot2::ggplot(odds, ggplot2::aes(or, item)) + ggplot2::geom_vline(xintercept = 1, linetype = "dashed", colour = "#64748b") + ggplot2::geom_errorbar(ggplot2::aes(xmin = low, xmax = high), orientation = "y", width = .12, colour = "#2563eb", linewidth = 1) + ggplot2::geom_point(colour = "#dc2626", size = 3) + theme + ggplot2::labs(title = "优势比与 95% 置信区间", x = "优势比 OR", y = NULL))
+    }
+    if (step == 6L) {
+      scores <- stats::predict(model, type = "response"); positive <- d$y == 1
+      cutoffs <- c(Inf, sort(unique(scores), decreasing = TRUE), -Inf)
+      roc <- do.call(rbind, lapply(cutoffs, function(cutoff) data.frame(
+        fpr = sum(scores >= cutoff & !positive) / max(1, sum(!positive)),
+        tpr = sum(scores >= cutoff & positive) / max(1, sum(positive)))))
+      return(ggplot2::ggplot(roc, ggplot2::aes(fpr, tpr)) + ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "#94a3b8") + ggplot2::geom_line(colour = "#2563eb", linewidth = 1.1) + ggplot2::coord_equal() + theme + ggplot2::labs(title = "ROC 曲线", x = "假阳性率", y = "真正率"))
+    }
+    p <- ggplot2::ggplot(d, ggplot2::aes(x, y)) + ggplot2::geom_jitter(height = .035, width = 0, alpha = .45, colour = "#64748b") + ggplot2::geom_line(data = grid, ggplot2::aes(x, probability), inherit.aes = FALSE, colour = "#2563eb", linewidth = 1.1) + theme + ggplot2::labs(title = "逻辑回归的概率曲线", x = "预测变量 X", y = "正类 / 预测概率")
+    if (step == 5L) p <- p + ggplot2::geom_hline(yintercept = threshold, linetype = "dashed", colour = "#d97706") + ggplot2::labs(subtitle = paste0("当前分类阈值 = ", threshold))
+    return(p)
+  }
+  if (key == "decision_tree") {
+    maxdepth <- as.integer(algorithm_tutorial_value(parameters, "maxdepth", 3L))
+    cp <- as.numeric(algorithm_tutorial_value(parameters, "cp", .01))
+    overlap <- as.numeric(algorithm_tutorial_value(parameters, "overlap", .6))
+    d <- data.frame(x = stats::runif(150, -2.5, 2.5), y = stats::runif(150, -2.5, 2.5))
+    signal <- ifelse(d$x < -.4, d$y > -.2, d$y > .8 - .45 * d$x)
+    flips <- stats::runif(nrow(d)) < overlap * .16
+    d$class <- factor(ifelse(xor(signal, flips), "A", "B"))
+    model <- rpart::rpart(class ~ x + y, d, method = "class",
+      control = rpart::rpart.control(cp = cp, maxdepth = maxdepth, minsplit = 10, xval = 0))
+    if (step == 6L) {
+      predicted <- stats::predict(model, d, type = "class"); confusion <- as.data.frame(table(实际 = d$class, 预测 = predicted))
+      return(ggplot2::ggplot(confusion, ggplot2::aes(实际, 预测, fill = Freq)) + ggplot2::geom_tile(colour = "white") + ggplot2::geom_text(ggplot2::aes(label = Freq), size = 5) + ggplot2::scale_fill_gradient(low = "#dbeafe", high = "#2563eb") + theme + ggplot2::labs(title = "混淆矩阵", fill = "样本数"))
+    }
+    grid <- expand.grid(x = seq(-2.5, 2.5, length.out = 100), y = seq(-2.5, 2.5, length.out = 100)); grid$prediction <- stats::predict(model, grid, type = "class")
+    p <- ggplot2::ggplot() + theme + ggplot2::coord_equal() + ggplot2::labs(title = "决策树如何切分特征空间", subtitle = paste0("最大深度 = ", maxdepth, "；cp = ", cp), colour = "真实类别", fill = "预测区域")
+    if (step >= 2L) p <- p + ggplot2::geom_raster(data = grid, ggplot2::aes(x, y, fill = prediction), alpha = .35) + ggplot2::scale_fill_manual(values = c(A = "#bfdbfe", B = "#fed7aa"))
+    p + ggplot2::geom_point(data = d, ggplot2::aes(x, y, colour = class), size = 2.3, alpha = .8) + ggplot2::scale_colour_manual(values = c(A = "#2563eb", B = "#d97706"))
+  } else if (key == "advanced_regression") {
+    correlation <- as.numeric(algorithm_tutorial_value(parameters, "correlation", .85))
+    lambda <- as.numeric(algorithm_tutorial_value(parameters, "lambda", .3))
+    curve <- as.numeric(algorithm_tutorial_value(parameters, "curve", 1))
+    x1 <- stats::rnorm(120); x2 <- correlation * x1 + sqrt(max(.001, 1 - correlation^2)) * stats::rnorm(120)
+    y <- 1.2 * x1 - .8 * x2 + curve * x1^2 + stats::rnorm(120, 0, .8); d <- data.frame(x1, x2, y)
+    if (step <= 2L) {
+      grid <- data.frame(x1 = seq(min(x1), max(x1), length.out = 160)); fit <- stats::lm(y ~ x1 + I(x1^2), d); grid$fit <- stats::predict(fit, grid)
+      p <- ggplot2::ggplot(d, ggplot2::aes(x1, y)) + ggplot2::geom_point(colour = "#2563eb", alpha = .55) + theme + ggplot2::labs(title = "线性关系与多项式弯曲", x = "X1", y = "Y")
+      if (step == 2L) p <- p + ggplot2::geom_line(data = grid, ggplot2::aes(x1, fit), inherit.aes = FALSE, colour = "#dc2626", linewidth = 1.1)
+      return(p)
+    }
+    if (step == 3L) {
+      grid <- expand.grid(x1 = seq(-2.5, 2.5, length.out = 80), x2 = seq(-2.5, 2.5, length.out = 80)); grid$effect <- grid$x1 * grid$x2
+      return(ggplot2::ggplot(grid, ggplot2::aes(x1, x2, fill = effect)) + ggplot2::geom_raster() + ggplot2::scale_fill_gradient2(low = "#2563eb", mid = "white", high = "#dc2626") + theme + ggplot2::labs(title = "交互项 X1 × X2", subtitle = "一个变量的作用方向取决于另一个变量", fill = "交互值"))
+    }
+    lambda_grid <- exp(seq(log(2), log(.005), length.out = 60)); xtx <- crossprod(scale(cbind(x1, x2))); xty <- crossprod(scale(cbind(x1, x2)), y - mean(y))
+    ridge <- do.call(rbind, lapply(lambda_grid, function(value) as.numeric(solve(xtx + diag(value * nrow(d), 2), xty))))
+    path <- data.frame(lambda = rep(lambda_grid, 2), coefficient = c(ridge[, 1], ridge[, 2]), variable = rep(c("X1", "X2"), each = length(lambda_grid)))
+    if (step %in% c(4L, 5L)) {
+      if (step == 5L) path$coefficient <- sign(path$coefficient) * pmax(abs(path$coefficient) - path$lambda * .35, 0)
+      return(ggplot2::ggplot(path, ggplot2::aes(lambda, coefficient, colour = variable)) + ggplot2::geom_line(linewidth = 1) + ggplot2::geom_vline(xintercept = lambda, linetype = "dashed", colour = "#172b4d") + ggplot2::scale_x_log10() + theme + ggplot2::labs(title = if (step == 4L) "岭回归系数路径" else "Lasso 稀疏系数路径", x = "λ（对数刻度）", y = "标准化系数", colour = "变量"))
+    }
+    cv <- data.frame(lambda = lambda_grid, error = 1 + .22 * (log(lambda_grid) - log(.08))^2 + stats::runif(length(lambda_grid), 0, .05))
+    ggplot2::ggplot(cv, ggplot2::aes(lambda, error)) + ggplot2::geom_line(colour = "#2563eb", linewidth = 1) + ggplot2::geom_vline(xintercept = cv$lambda[which.min(cv$error)], linetype = "dashed", colour = "#d97706") + ggplot2::scale_x_log10() + theme + ggplot2::labs(title = "交叉验证选择惩罚强度", x = "λ（对数刻度）", y = "验证误差")
+  } else if (key == "svm") {
     shape <- algorithm_tutorial_value(parameters, "shape", "curved")
     kernel <- algorithm_tutorial_value(parameters, "kernel", "radial")
     cost <- as.numeric(algorithm_tutorial_value(parameters, "cost", 1))
@@ -208,7 +320,7 @@ algorithm_title_ui <- function(ns, title) {
   tagList(
     tags$style(HTML(".algorithm-title-row{display:flex;align-items:center;width:100%;gap:16px;margin-top:20px;margin-bottom:10px}.algorithm-title-row h3{margin:0;flex:0 0 auto;white-space:nowrap}.algorithm-title-row .algorithm-tutorial-toggle{margin-left:auto;flex:0 0 auto;border:1px solid #8db7ef;background:#eef6ff;color:#174a8b;border-radius:999px;font-weight:750;padding:4px 11px}.algorithm-title-row .algorithm-tutorial-toggle:hover,.algorithm-title-row .algorithm-tutorial-toggle:focus{background:#dcecff;color:#123f78;border-color:#6ea3e6}@media(max-width:600px){.algorithm-title-row{gap:8px;margin-top:16px}.algorithm-title-row .algorithm-tutorial-toggle{padding:3px 9px}}")),
     tags$div(class = "algorithm-title-row", h3(title),
-      actionButton(ns("tutorial_toggle"), "原理教程", icon = icon("graduation-cap"), class = "btn-sm algorithm-tutorial-toggle"))
+      actionButton(ns("tutorial_toggle"), "原理演示", icon = icon("graduation-cap"), class = "btn-sm algorithm-tutorial-toggle"))
   )
 }
 
@@ -217,7 +329,7 @@ algorithm_tutorial_ui <- function(id, key) {
   tagList(
     tags$style(HTML(".algorithm-tutorial{background:linear-gradient(145deg,#f8fbff,#fff);border:1px solid #cfe0f5;border-radius:14px;padding:16px;margin-bottom:16px}.algorithm-tutorial-header{font-size:20px;font-weight:850;color:#173d70}.algorithm-tutorial-parameters{background:#fff;border:1px solid #d9e6f6;border-radius:12px;padding:12px 12px 2px;margin:12px 0}.algorithm-tutorial-parameters .form-group{margin-bottom:8px}.algorithm-tutorial-regenerate{display:flex;justify-content:flex-end;margin:0 0 10px}.algorithm-tutorial-controls{display:flex;gap:8px;flex-wrap:wrap;background:#eef5ff;border-radius:12px;padding:12px;margin:12px 0}.algorithm-tutorial-card{background:#fff;border-left:5px solid #2563eb;border-radius:10px;padding:14px 16px;box-shadow:0 2px 10px rgba(31,78,139,.08);min-height:265px}.algorithm-tutorial-card h4{margin-top:0;color:#173d70;font-weight:850}.algorithm-tutorial-markdown{font-size:15px;line-height:1.75;color:#405875}.algorithm-tutorial-formula{background:#f1f5f9;border-radius:8px;padding:10px 12px;margin:12px 0;color:#24476f;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.algorithm-tutorial-tip{background:#eaf3ff;border-radius:8px;padding:10px 12px;color:#174a8b}.algorithm-tutorial-progress{height:9px;background:#dce7f5;border-radius:999px;overflow:hidden;margin-top:8px}.algorithm-tutorial-progress span{display:block;height:100%;background:linear-gradient(90deg,#2563eb,#06b6d4)}.algorithm-tutorial-stats{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.algorithm-tutorial-stat{background:#eaf3ff;color:#174a8b;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:750}")),
     tags$div(class = "algorithm-tutorial",
-      tags$div(class = "algorithm-tutorial-header", icon("graduation-cap"), " 算法原理分步教程"),
+      tags$div(class = "algorithm-tutorial-header", icon("graduation-cap"), " 算法原理分步演示"),
       p("调整参数观察图形和计算结果如何变化，再使用下一步理解算法过程。教程数据与当前导入的数据相互独立。"),
       algorithm_tutorial_parameters_ui(ns, key),
       tags$div(class = "algorithm-tutorial-controls",
@@ -235,6 +347,9 @@ algorithm_tutorial_server <- function(id, key) {
     lessons <- algorithm_tutorial_lessons(key); step <- reactiveVal(1L); total <- length(lessons); generation <- reactiveVal(0L)
     parameters <- reactive(switch(key,
       regression = list(sample_n = input$sample_n, slope = input$slope, noise = input$noise, outlier = input$outlier),
+      logistic = list(sample_n = input$sample_n, effect = input$effect, threshold = input$threshold),
+      decision_tree = list(maxdepth = input$maxdepth, cp = input$cp, overlap = input$overlap),
+      advanced_regression = list(correlation = input$correlation, lambda = input$lambda, curve = input$curve),
       svm = list(shape = input$shape, kernel = input$kernel, cost = input$cost, gamma = input$gamma),
       pca = list(correlation = input$correlation, scale_ratio = input$scale_ratio, standardize = input$standardize),
       kmeans = list(true_groups = input$true_groups, centers = input$centers, overlap = input$overlap, standardize = input$standardize),
@@ -251,6 +366,9 @@ algorithm_tutorial_server <- function(id, key) {
       values <- parameters()
       labels <- switch(key,
         regression = c(sample_n = "样本量", slope = "真实斜率", noise = "噪声", outlier = "异常点"),
+        logistic = c(sample_n = "样本量", effect = "关系强度", threshold = "阈值"),
+        decision_tree = c(maxdepth = "最大深度", cp = "cp", overlap = "类别重叠"),
+        advanced_regression = c(correlation = "相关程度", lambda = "λ", curve = "非线性"),
         svm = c(shape = "数据", kernel = "核", cost = "C", gamma = "γ"),
         pca = c(correlation = "相关程度", scale_ratio = "量纲倍数", standardize = "标准化"),
         kmeans = c(true_groups = "真实组数", centers = "指定 K", overlap = "重叠", standardize = "标准化"),
@@ -278,7 +396,7 @@ algorithm_tutorial_server <- function(id, key) {
 algorithm_tutorial_toggle_server <- function(input, session) {
   observeEvent(input$tutorial_toggle, {
     opened <- input$tutorial_toggle %% 2L == 1L
-    updateActionButton(session, "tutorial_toggle", label = if (opened) "收起教程" else "原理教程",
+    updateActionButton(session, "tutorial_toggle", label = if (opened) "收起演示" else "原理演示",
       icon = icon(if (opened) "chevron-up" else "graduation-cap"))
   })
 }

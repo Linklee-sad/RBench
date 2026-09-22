@@ -7,30 +7,41 @@ startup_ui <- function(id) {
         tags$div(tags$h1("EasyR"), tags$p("数据分析工作台"))
       ),
       tags$div(class = "startup-actions",
-        actionButton(ns("new_project"), "创建新项目", icon = icon("plus"),
+        actionButton(ns("new_project"), "创建数据分析项目", icon = icon("plus"),
           class = "btn-primary startup-primary"),
-        tags$div(class = "startup-divider", tags$span("或者")),
+        actionButton(ns("learning"), "进入学习模式", icon = icon("graduation-cap"),
+          class = "btn-default startup-learning"),
+        tags$p(class = "startup-learning-hint", "从概率与统计基础开始，通过公式、模拟和互动图形逐步学习。"),
+        tags$div(class = "startup-divider", tags$span("打开已有分析项目")),
         fileInput(ns("project_file"), "打开已有 EasyR 项目", accept = c(".easyr", ".rds"),
           buttonLabel = "选择项目文件", placeholder = "尚未选择项目文件"),
         tags$p(class = "startup-file-hint", "选择后自动打开项目"),
-        actionButton(ns("sample"), "试用示例数据", icon = icon("flask"),
-          class = "btn-link startup-sample"),
+        tags$div(class = "startup-example-picker",
+          selectInput(ns("example_dataset"), "选择示例数据集", easyr_example_choices(), selected = "iris"),
+          tags$p(class = "startup-file-hint", textOutput(ns("example_description"))),
+          actionButton(ns("sample"), "使用所选示例开始", icon = icon("flask"),
+            class = "btn-default startup-sample")
+        ),
         tags$div(class = "startup-status", textOutput(ns("status")))
       )
     )
   )
 }
 
-startup_server <- function(id, imported, project_channel, app_input, app_session, enter_workspace) {
+startup_server <- function(id, imported, project_channel, app_input, app_session, enter_workspace, enter_learning) {
   moduleServer(id, function(input, output, session) {
     status <- reactiveVal("创建一个新项目，或打开之前保存的 .easyr 项目。")
 
     observeEvent(input$new_project, enter_workspace())
+    observeEvent(input$learning, enter_learning())
 
     observeEvent(input$sample, {
-      imported$add(list(`内置示例 iris` = iris))
+      example <- easyr_example_dataset(input$example_dataset)
+      imported$add(stats::setNames(list(example$data), example$name))
       enter_workspace()
     })
+
+    output$example_description <- renderText(easyr_example_dataset(input$example_dataset)$description)
 
     observeEvent(input$project_file, {
       req(input$project_file)

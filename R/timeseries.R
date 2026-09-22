@@ -905,7 +905,7 @@ timeseries_server <- function(id, data, directory = reactive(getwd()), ai_config
           if (!is.null(result()$garch)) result()$garch$report,
           if (!is.null(result()$forecast)) result()$forecast$report), collapse = "\n\n---\n\n")
       }),
-      reactive(if (is.null(result())) NULL else ai_model_context("时间序列分析", result())))
+      reactive(if (is.null(result())) NULL else ai_model_context("时间序列分析", result())), analysis_data)
     acf_plot <- reactive({
       req(result())
       tryCatch(build_time_series_acf_plot(result(), input$max_lag),
