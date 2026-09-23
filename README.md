@@ -36,6 +36,16 @@ EasyR 是一个模块化的 R Shiny 应用，适合希望使用 R 完成数据�
 
 ## 快速开始
 
+### 在线部署
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Linklee-sad/EasyR)
+
+点击上面的按钮可以从本仓库创建一个独立的 Render Web Service。仓库中的 `Dockerfile` 会安装 R、EasyR 及全部运行依赖，`render.yaml` 会配置端口、健康检查和后续自动部署。Render 会要求用户登录自己的账号并确认所用套餐；可用套餐和计费以 Render 页面显示为准。
+
+也可以使用 **Posit Connect Cloud**：登录 [Connect Cloud](https://connect.posit.cloud/)，选择 **Publish → Shiny → Public GitHub repository**，填写 `https://github.com/Linklee-sad/EasyR`，选择 `main` 分支和 `app.R`。本仓库的 `manifest.json` 提供 R 与软件包依赖；开启自动重新发布后，仓库更新可以触发重新构建。
+
+在线实例设置了 `EASYR_HOSTED=1`。在此模式下，AI API Key 只存在当前会话，不允许写入服务器配置文件。上传的数据和 `.easyr` 项目仍可能包含敏感内容；公开部署时应使用非敏感数据，且不要把 API Key 写入仓库、Dockerfile 或 `render.yaml`。容器文件系统属于临时运行环境，长期项目请下载到自己的设备保存。
+
 ### 环境要求
 
 - R 4.2 或更高版本（推荐）

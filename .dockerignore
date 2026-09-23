@@ -1,0 +1,12 @@
+.git
+.github
+.R-library
+.Rhistory
+.RData
+.Rproj.user
+Test Data
+outputs
+rsconnect
+*.easyr
+*_test.R
+.DS_Store

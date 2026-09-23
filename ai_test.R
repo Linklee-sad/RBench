@@ -30,6 +30,15 @@ stopifnot(file.exists(local_config_path), identical(local_loaded$provider, "cust
 ai_delete_local_config(local_config_path)
 stopifnot(!file.exists(local_config_path), is.null(ai_read_local_config(local_config_path)))
 
+old_hosted_option <- getOption("easyr.hosted")
+options(easyr.hosted = TRUE)
+stopifnot(ai_hosted_mode())
+hosted_ui <- as.character(ai_settings_ui("hosted_ai"))
+stopifnot(grepl("在线部署模式", hosted_ui, fixed = TRUE),
+  !grepl("hosted_ai-save_local", hosted_ui, fixed = TRUE),
+  !grepl("hosted_ai-delete_local", hosted_ui, fixed = TRUE))
+options(easyr.hosted = old_hosted_option)
+
 d <- data.frame(name = c("甲", "乙"), email = c("a@example.com", "b@example.com"), value = c(1, NA))
 summary_only <- ai_dataset_profile(d, FALSE)
 with_sample <- ai_dataset_profile(d, TRUE)

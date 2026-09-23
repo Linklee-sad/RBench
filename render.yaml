@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: easyr
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    envVars:
+      - key: EASYR_HOSTED
+        value: "1"

@@ -29,6 +29,12 @@ ai_local_config_path <- function() {
   file.path(tools::R_user_dir("EasyR", which = "config"), "ai-settings.json")
 }
 
+ai_hosted_mode <- function() {
+  option <- isTRUE(getOption("easyr.hosted", FALSE))
+  value <- tolower(trimws(Sys.getenv("EASYR_HOSTED", "")))
+  option || value %in% c("1", "true", "yes", "on")
+}
+
 ai_local_config_fields <- function(config) {
   provider <- as.character(config$provider %||% "openai")[1]
   if (!provider %in% c("openai", "deepseek", "qwen", "gemini", "claude", "custom")) stop("供应商设置无效。", call. = FALSE)
@@ -556,16 +562,22 @@ ai_settings_ui <- function(id) {
       ),
       p(class = "ai-local-note", "默认关闭。开启后，数据顾问、AI 参数推荐和 AI 报告会在统计摘要之外发送当前数据集的前几行，帮助 AI 理解字段格式和实际取值。疑似姓名、电话、邮箱、账号、密码等字段会自动隐藏样例值。")
     ),
-    tags$div(class = "ai-local-config",
-      h4(icon("hard-drive"), " 本地保存"),
-      checkboxInput(ns("allow_local_save"), "我选择将当前 AI 连接配置保存在这台电脑上", FALSE),
-      p(class = "ai-local-note", "配置包含供应商、模型、API 地址、协议和 API Key，不包含数据集或个人信息。API Key 会以可读取文本保存在当前用户的配置目录，请勿在公共电脑上启用。"),
-      tags$div(class = "ai-local-actions",
-        actionButton(ns("save_local"), "保存到本机", icon = icon("floppy-disk"), class = "btn-primary"),
-        actionButton(ns("delete_local"), "删除本地配置", icon = icon("trash"), class = "btn-danger")
+    if (ai_hosted_mode())
+      tags$div(class = "ai-local-config",
+        h4(icon("cloud"), " 在线部署模式"),
+        p(class = "ai-local-note", "API Key 仅保存在当前浏览器会话对应的 R 会话中。在线实例不会提供“保存到本机”，避免其他访问者读取同一服务器上的密钥。关闭页面或会话结束后需要重新填写。")
+      )
+    else
+      tags$div(class = "ai-local-config",
+        h4(icon("hard-drive"), " 本地保存"),
+        checkboxInput(ns("allow_local_save"), "我选择将当前 AI 连接配置保存在这台电脑上", FALSE),
+        p(class = "ai-local-note", "配置包含供应商、模型、API 地址、协议和 API Key，不包含数据集或个人信息。API Key 会以可读取文本保存在当前用户的配置目录，请勿在公共电脑上启用。"),
+        tags$div(class = "ai-local-actions",
+          actionButton(ns("save_local"), "保存到本机", icon = icon("floppy-disk"), class = "btn-primary"),
+          actionButton(ns("delete_local"), "删除本地配置", icon = icon("trash"), class = "btn-danger")
+        ),
+        tags$div(class = "ai-local-path", textOutput(ns("config_location")))
       ),
-      tags$div(class = "ai-local-path", textOutput(ns("config_location")))
-    ),
     actionButton(ns("test"), "测试连接", class = "btn-primary"),
     tags$span(style = "margin-left:12px", textOutput(ns("status"), inline = TRUE)),
     hr(),
@@ -583,7 +595,8 @@ ai_settings_ui <- function(id) {
 
 ai_settings_server <- function(id, config_path = ai_local_config_path()) {
   moduleServer(id, function(input, output, session) {
-    saved_config <- ai_read_local_config(config_path)
+    hosted <- ai_hosted_mode()
+    saved_config <- if (hosted) NULL else ai_read_local_config(config_path)
     status <- reactiveVal(if (is.null(saved_config)) "尚未测试连接。" else
       paste0("已读取本机配置 · ", saved_config$provider, " · ", saved_config$model, " · ", ai_mask_key(saved_config$api_key)))
     first_provider_event <- TRUE
@@ -633,6 +646,10 @@ ai_settings_server <- function(id, config_path = ai_local_config_path()) {
     })
     output$config_location <- renderText({ paste0("配置位置：", config_path) })
     observeEvent(input$save_local, {
+      if (hosted) {
+        status("在线部署模式不会保存 API Key；密钥只用于当前会话。")
+        return()
+      }
       if (!isTRUE(input$allow_local_save)) {
         status("如需保存，请先勾选本地保存选项。")
         return()
@@ -643,6 +660,10 @@ ai_settings_server <- function(id, config_path = ai_local_config_path()) {
       }, error = function(e) status(paste0("保存失败：", conditionMessage(e))))
     })
     observeEvent(input$delete_local, {
+      if (hosted) {
+        status("在线部署模式没有服务器端 AI 配置文件。")
+        return()
+      }
       tryCatch({
         ai_delete_local_config(config_path)
         updateCheckboxInput(session, "allow_local_save", value = FALSE)
