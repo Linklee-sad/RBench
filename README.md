@@ -1,13 +1,13 @@
 <div align="center">
 
-# EasyR
+# RBench
 
 **面向实际工作的无代码 R 数据分析工作台**
 
 导入数据、清洗整理、统计绘图、建立模型、生成报告，全程通过界面操作。
 
 ![R](https://img.shields.io/badge/R-Shiny-276DC3?logo=r&logoColor=white)
-![R tests](https://github.com/Linklee-sad/EasyR/actions/workflows/r-tests.yml/badge.svg)
+![R tests](https://github.com/Linklee-sad/RBench/actions/workflows/r-tests.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-MIT-059669.svg)
 ![UI](https://img.shields.io/badge/UI-中文%20%7C%20English-2563EB)
 ![Data](https://img.shields.io/badge/Data-CSV%20%7C%20Excel-059669)
@@ -17,7 +17,7 @@
 
 ---
 
-EasyR 是一个模块化的 R Shiny 应用，适合希望使用 R 完成数据分析、但不想为每一步编写代码的用户。它以项目为单位组织工作：从 CSV、Excel、Yahoo Finance 或 FRED 获取数据，完成清洗、可视化和建模，然后导出图像、表格与报告。
+RBench 是一个模块化的 R Shiny 应用，适合希望使用 R 完成数据分析、但不想为每一步编写代码的用户。它以项目为单位组织工作：从 CSV、Excel、Yahoo Finance 或 FRED 获取数据，完成清洗、可视化和建模，然后导出图像、表格与报告。
 
 ## 主要功能
 
@@ -39,17 +39,17 @@ EasyR 是一个模块化的 R Shiny 应用，适合希望使用 R 完成数据�
 ### 在线部署
 
 [![Deploy to Posit Connect Cloud Free](https://img.shields.io/badge/Deploy-Posit%20Connect%20Cloud%20Free-447099?style=for-the-badge&logo=posit&logoColor=white)](https://connect.posit.cloud/)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Linklee-sad/EasyR)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Linklee-sad/RBench)
 
 **Posit Connect Cloud Free（推荐）**：点击第一个按钮并登录，选择 **Publish → Shiny → Public GitHub repository**，然后填写：
 
-- Repository：`https://github.com/Linklee-sad/EasyR`
+- Repository：`https://github.com/Linklee-sad/RBench`
 - Branch：`main`
 - Primary file：`app.R`
 
 本仓库的 `manifest.json` 已包含 R 与软件包依赖。免费方案会生成公开访问链接；开启自动重新发布后，仓库更新可以触发重新构建。
 
-**Render Free**：点击第二个按钮可以从本仓库创建独立的 Render Web Service。仓库中的 `Dockerfile` 会安装 R、EasyR 及全部运行依赖，`render.yaml` 会配置免费实例、端口、健康检查和后续自动部署。Render 会要求用户登录自己的账号并确认套餐。
+**Render Free**：点击第二个按钮可以从本仓库创建独立的 Render Web Service。仓库中的 `Dockerfile` 会安装 R、RBench 及全部运行依赖，`render.yaml` 会配置免费实例、端口、健康检查和后续自动部署。Render 会要求用户登录自己的账号并确认套餐。
 
 在线实例设置了 `EASYR_HOSTED=1`。在此模式下，AI API Key 只存在当前会话，不允许写入服务器配置文件。上传的数据和 `.easyr` 项目仍可能包含敏感内容；公开部署时应使用非敏感数据，且不要把 API Key 写入仓库、Dockerfile 或 `render.yaml`。容器文件系统属于临时运行环境，长期项目请下载到自己的设备保存。
 
@@ -64,8 +64,8 @@ EasyR 是一个模块化的 R Shiny 应用，适合希望使用 R 完成数据�
 克隆或下载项目：
 
 ```bash
-git clone https://github.com/Linklee-sad/EasyR.git
-cd EasyR
+git clone https://github.com/Linklee-sad/RBench.git
+cd RBench
 ```
 
 在 RStudio 中打开 `app.R`，点击 **Run App**。项目中的 `.Rprofile` 会让应用默认在系统浏览器中打开。
@@ -97,7 +97,7 @@ Rscript setup.R
 
 ## 数据导入与整理
 
-EasyR 支持：
+RBench 支持：
 
 - 单个或批量 CSV，UTF-8／GB18030 编码及逗号、分号、制表符分隔；
 - `.xlsx` 和 `.xls` 工作簿及工作表选择；
@@ -159,7 +159,7 @@ EasyR 支持：
 
 ## AI 数据顾问
 
-AI 功能支持 OpenAI、DeepSeek、Google Gemini、Anthropic Claude、通义千问（Qwen）和兼容第三方接口。用户只需要填写供应商、模型、API URL（第三方）和 API Key；EasyR 会自动使用各内置供应商对应的接口格式与认证方式。
+AI 功能支持 OpenAI、DeepSeek、Google Gemini、Anthropic Claude、通义千问（Qwen）和兼容第三方接口。用户只需要填写供应商、模型、API URL（第三方）和 API Key；RBench 会自动使用各内置供应商对应的接口格式与认证方式。
 
 AI 可以：
 
@@ -194,7 +194,7 @@ AI 可以：
 ## 项目结构
 
 ```text
-EasyR/
+RBench/
 ├── app.R                         # Shiny 入口与模块连接
 ├── setup.R                       # 自动检查和安装依赖
 ├── .Rprofile                     # 默认使用系统浏览器
@@ -296,4 +296,4 @@ done
 
 ## License
 
-EasyR 使用 [MIT License](LICENSE)。你可以使用、复制、修改、发布和分发本项目，但需要保留原始版权和许可声明。
+RBench 使用 [MIT License](LICENSE)。你可以使用、复制、修改、发布和分发本项目，但需要保留原始版权和许可声明。

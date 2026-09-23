@@ -140,7 +140,7 @@ ggplot_editor_server <- function(id, plot, directory = reactive(getwd()), filena
       req(plot())
       tryCatch({
         path <- save_to_workdir(directory(), filename, ".png", write_png)
-        saved(paste("上次保存：", path)); showNotification("PNG 已保存到 EasyR 项目文件夹。", type = "message")
+        saved(paste("上次保存：", path)); showNotification("PNG 已保存到 RBench 项目文件夹。", type = "message")
       }, error = function(e) showNotification(conditionMessage(e), type = "error"))
     })
     styled

@@ -10,7 +10,7 @@ stopifnot(
   grepl("创建数据分析项目", rendered),
   grepl("进入学习模式", rendered),
   grepl("打开函数绘图工具", rendered),
-  grepl("打开已有 EasyR 项目", rendered),
+  grepl("打开已有 RBench 项目", rendered),
   grepl("选择后自动打开项目", rendered),
   !grepl("startup-open_project", rendered, fixed = TRUE),
   grepl("选择示例数据集", rendered),

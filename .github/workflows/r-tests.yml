@@ -33,7 +33,7 @@ jobs:
             any::quantmod
             any::tseries
           needs: check
-      - name: Run EasyR test suite
+      - name: Run RBench test suite
         shell: bash
         run: |
           set -euo pipefail

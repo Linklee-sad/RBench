@@ -4,7 +4,7 @@ startup_ui <- function(id) {
     tags$div(class = "startup-card",
       tags$div(class = "startup-brand",
         tags$div(class = "startup-brand-mark", icon("chart-simple")),
-        tags$div(tags$h1("EasyR"), tags$p("数据分析工作台"))
+        tags$div(tags$h1("RBench"), tags$p("数据分析工作台"))
       ),
       tags$div(class = "startup-actions",
         actionButton(ns("new_project"), "创建数据分析项目", icon = icon("plus"),
@@ -16,7 +16,7 @@ startup_ui <- function(id) {
           class = "btn-default startup-learning startup-function-plotter"),
         tags$p(class = "startup-learning-hint", "直接输入数学函数并绘图，不需要创建项目或导入数据。"),
         tags$div(class = "startup-divider", tags$span("打开已有分析项目")),
-        fileInput(ns("project_file"), "打开已有 EasyR 项目", accept = c(".easyr", ".rds"),
+        fileInput(ns("project_file"), "打开已有 RBench 项目", accept = c(".easyr", ".rds"),
           buttonLabel = "选择项目文件", placeholder = "尚未选择项目文件"),
         tags$p(class = "startup-file-hint", "选择后自动打开项目"),
         tags$div(class = "startup-example-picker",
@@ -56,7 +56,7 @@ startup_server <- function(id, imported, project_channel, app_input, app_session
         )
         status(sprintf("恢复完成：%d 个数据集。", length(project$import$datasets)))
         enter_workspace()
-        showNotification("EasyR 项目已恢复。", type = "message")
+        showNotification("RBench 项目已恢复。", type = "message")
       }, error = function(e) {
         status(paste0("打开失败：", conditionMessage(e)))
         showNotification(conditionMessage(e), type = "error", duration = 10)

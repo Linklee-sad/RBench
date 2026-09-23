@@ -81,4 +81,4 @@ testServer(app_env$server, {
     grepl("恢复完成", output[["project-status"]]))
 })
 
-cat("EasyR 项目数据集、活动状态、整理版本、缺失值规则、分析参数、隐私过滤、文件往返和完整应用恢复检查通过。\n")
+cat("RBench 项目数据集、活动状态、整理版本、缺失值规则、分析参数、隐私过滤、文件往返和完整应用恢复检查通过。\n")

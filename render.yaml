@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: easyr
+    name: rbench
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile

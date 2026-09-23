@@ -742,7 +742,7 @@ workbench_server <- function(id, original, directory = reactive(getwd()), datase
       tryCatch({
         path <- save_to_workdir(directory(), "easyr-data", ".csv", write_csv)
         saved_csv(paste("上次保存：", path))
-        showNotification("CSV 已保存到 EasyR 项目文件夹。", type = "message")
+        showNotification("CSV 已保存到 RBench 项目文件夹。", type = "message")
       }, error = function(e) showNotification(conditionMessage(e), type = "error"))
     })
     data

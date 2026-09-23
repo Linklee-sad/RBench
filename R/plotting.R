@@ -643,7 +643,7 @@ analysis_server <- function(id, data, directory = reactive(getwd())) {
       tryCatch({
         path <- save_to_workdir(directory(), "easyr-chart", ".png", write_png)
         saved_png(paste("上次保存：", path))
-        showNotification("PNG 已保存到 EasyR 项目文件夹。", type = "message")
+        showNotification("PNG 已保存到 RBench 项目文件夹。", type = "message")
       }, error = function(e) showNotification(conditionMessage(e), type = "error"))
     })
   })

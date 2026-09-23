@@ -241,7 +241,7 @@ import_server <- function(id) {
       if (length(selected) != 1L || !selected %in% names(state$datasets)) selected <- names(state$datasets)[1L]
       refresh_choices(selected)
       revision(revision() + 1L)
-      status(sprintf("已从 EasyR 项目恢复 %d 个数据集。", length(state$datasets)))
+      status(sprintf("已从 RBench 项目恢复 %d 个数据集。", length(state$datasets)))
       invisible(selected)
     }
     output$file_info <- renderText({

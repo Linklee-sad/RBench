@@ -2797,13 +2797,13 @@
   },
   "files": {
     "app.R": {
-      "checksum": "e875921d5bd1b6692e5529561a1d9456"
+      "checksum": "130256cbd631ab7ead9244720d871f98"
     },
     "R/advanced_regression.R": {
       "checksum": "414c3c1509b961c5943be725d0b73a37"
     },
     "R/ai.R": {
-      "checksum": "d1fd09132a1d5629d71ce85b4cae2fd7"
+      "checksum": "10337224d2a359176f4c3fd303275053"
     },
     "R/algorithm_tutorials.R": {
       "checksum": "b51c1186742471b80240c2c18a09b75f"
@@ -2821,19 +2821,19 @@
       "checksum": "3e3e2e3828572976e2c72c4b6d583f46"
     },
     "R/home.R": {
-      "checksum": "6ee8ccd544ea67f5b76c9fb8c477bd82"
+      "checksum": "4cbf3766a8daff6e3ea39a296656a4c2"
     },
     "R/i18n.R": {
-      "checksum": "78e592bcfaa8ee3bf0cd20fcdeb9a5d5"
+      "checksum": "089c8e082707d26dd88c467632adadfc"
     },
     "R/import.R": {
-      "checksum": "f48c2e814e9d60bd441bad308a94317a"
+      "checksum": "a291dd83bda39cbe48df9f2c26c96b27"
     },
     "R/kmeans.R": {
-      "checksum": "ad07fce78006e0da93e4fe5165044b45"
+      "checksum": "d477bd09b370b75805351564778b8239"
     },
     "R/logistic_regression.R": {
-      "checksum": "a258ea336f0e3e67018b0999108cab9f"
+      "checksum": "0d0bfebfe1c786b9d8d032e485d2e7bd"
     },
     "R/model_comparison.R": {
       "checksum": "8bec3ece65190949020576ac8b8957f7"
@@ -2842,31 +2842,31 @@
       "checksum": "c60fd3f6d7a2b5a562929c461e66853c"
     },
     "R/pca.R": {
-      "checksum": "e0b23b74e4ea3c9618fcc989223635d7"
+      "checksum": "8b803527eded556ddb2c60b6bebfebd6"
     },
     "R/plot_editor.R": {
-      "checksum": "4bf34463dca86401020d6e408c6749b4"
+      "checksum": "1f31dbc4f04acfa9adf7fbbf3edfd89d"
     },
     "R/plotting.R": {
-      "checksum": "d740ba602305e63345e40fe6766a3e03"
+      "checksum": "d5cafdfc525b7bc786447214dc17b8f2"
     },
     "R/preview.R": {
       "checksum": "0e0ab81dc9473890016c2bb1f335b284"
     },
     "R/project.R": {
-      "checksum": "d9122e9e6bac8519ee08ad9f6a21bcb8"
+      "checksum": "c41b1682e58525dc5911a978f0d9d2e1"
     },
     "R/random_forest_tutorial.R": {
       "checksum": "f2d62e0d5b6060e3a72b8bb481343a52"
     },
     "R/random_forest.R": {
-      "checksum": "b2ac03e4fe6a5cf89cd2fdac57050aec"
+      "checksum": "2426654415af59370b1eff3445afe16a"
     },
     "R/regression.R": {
       "checksum": "68c013b5267eed952848c87daa1b415e"
     },
     "R/svm.R": {
-      "checksum": "d45d9dee180d667b5946c2c3cd1295b1"
+      "checksum": "c6cabca6379940b71b3fd87f45e1e017"
     },
     "R/teaching.R": {
       "checksum": "d1a325de3ab05b507a5bed7c192bb219"
@@ -2875,7 +2875,7 @@
       "checksum": "75243937ee57e15994b2f7f24e766c89"
     },
     "R/workbench.R": {
-      "checksum": "a9c4f18510b532a1456993dac3aa3595"
+      "checksum": "712b5d144a590b9a84703e76c07052da"
     },
     "setup.R": {
       "checksum": "9ffacb25502271a600bf86cf8b65171e"

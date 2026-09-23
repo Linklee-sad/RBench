@@ -292,7 +292,7 @@ svm_server <- function(id, data, directory = reactive(getwd()), ai_config = reac
       req(result())
       tryCatch({
         path <- save_to_workdir(directory(), "easyr-svm", ".txt", write_report)
-        saved(paste("上次保存：", path)); showNotification("SVM 报告已保存到 EasyR 项目文件夹。", type = "message")
+        saved(paste("上次保存：", path)); showNotification("SVM 报告已保存到 RBench 项目文件夹。", type = "message")
       }, error = function(e) showNotification(conditionMessage(e), type = "error"))
     })
     result

@@ -1,12 +1,12 @@
-# 参与 EasyR 开发
+# 参与 RBench 开发
 
-感谢你愿意改进 EasyR。提交代码前，请先确认改动适合“通过界面完成 R 数据分析”的产品方向，并尽量保持操作简单、结果可解释。
+感谢你愿意改进 RBench。提交代码前，请先确认改动适合“通过界面完成 R 数据分析”的产品方向，并尽量保持操作简单、结果可解释。
 
 ## 提交问题
 
 创建 Issue 前请先搜索是否已有相同问题。Bug 报告应包含：
 
-- 操作系统、R 版本和 EasyR 版本或提交；
+- 操作系统、R 版本和 RBench 版本或提交；
 - 可以复现问题的最小操作步骤；
 - Console 中的完整错误信息；
 - 数据的字段类型和大致规模。
@@ -16,8 +16,8 @@
 ## 本地开发
 
 ```bash
-git clone https://github.com/Linklee-sad/EasyR.git
-cd EasyR
+git clone https://github.com/Linklee-sad/RBench.git
+cd RBench
 Rscript setup.R
 Rscript -e 'shiny::runApp(".", launch.browser = TRUE)'
 ```

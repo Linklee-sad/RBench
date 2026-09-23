@@ -74,11 +74,11 @@ build_easyr_project <- function(import_state, workbench_state = list(), ui_state
 
 validate_easyr_project <- function(project) {
   if (!is.list(project) || !identical(project$format, "EasyR Project")) {
-    stop("这不是可识别的 EasyR 项目文件。", call. = FALSE)
+    stop("这不是可识别的 RBench 项目文件。", call. = FALSE)
   }
   version <- suppressWarnings(as.integer(project$version))
   if (length(version) != 1L || is.na(version) || version < 1L || version > easyr_project_version) {
-    stop("项目文件版本与当前 EasyR 不兼容。", call. = FALSE)
+    stop("项目文件版本与当前 RBench 不兼容。", call. = FALSE)
   }
   if (!is.list(project$import)) stop("项目缺少数据集状态。", call. = FALSE)
   validate_project_datasets(project$import$datasets)
@@ -95,10 +95,10 @@ validate_easyr_project <- function(project) {
 project_ui <- function(id) {
   ns <- NS(id)
   tags$details(class = "project-card",
-    tags$summary(icon("folder-open"), tags$span("EasyR 项目保存与恢复")),
+    tags$summary(icon("folder-open"), tags$span("RBench 项目保存与恢复")),
     tags$div(class = "project-card-body",
       p(class = "project-card-hint", "保存全部数据集、当前数据集、整理状态以及分析和绘图参数。项目文件不包含 API Key。"),
-      downloadButton(ns("save_project"), "保存 EasyR 项目", class = "btn-primary project-save-button"),
+      downloadButton(ns("save_project"), "保存 RBench 项目", class = "btn-primary project-save-button"),
       fileInput(ns("project_file"), "打开已有项目", accept = c(".easyr", ".rds"),
         buttonLabel = "选择项目", placeholder = "尚未选择项目文件"),
       actionButton(ns("restore_project"), "恢复这个项目", icon = icon("clock-rotate-left")),
@@ -108,7 +108,7 @@ project_ui <- function(id) {
 }
 
 restore_easyr_project_upload <- function(upload, imported, project_channel, app_input, app_session) {
-  if (is.null(upload) || !length(upload$datapath)) stop("请先选择 EasyR 项目文件。", call. = FALSE)
+  if (is.null(upload) || !length(upload$datapath)) stop("请先选择 RBench 项目文件。", call. = FALSE)
   if (upload$size > 1500 * 1024^2) stop("项目文件超过 1500 MB，无法在当前界面恢复。", call. = FALSE)
   project <- validate_easyr_project(readRDS(upload$datapath))
   imported$restore(project$import)
@@ -132,7 +132,7 @@ project_server <- function(id, imported, project_channel, app_input, app_session
       build_easyr_project(imported$snapshot(), workbench, ui)
     }
     output$save_project <- downloadHandler(
-      filename = function() paste0("EasyR-project-", format(Sys.time(), "%Y%m%d-%H%M%S"), ".easyr"),
+      filename = function() paste0("RBench-project-", format(Sys.time(), "%Y%m%d-%H%M%S"), ".easyr"),
       content = function(file) {
         project <- current_project()
         saveRDS(project, file, compress = "gzip", version = 3)
@@ -148,7 +148,7 @@ project_server <- function(id, imported, project_channel, app_input, app_session
         )
         status(sprintf("恢复完成：%d 个数据集，当前数据集为“%s”。模型需要重新点击运行。",
           length(project$import$datasets), project$import$active))
-        showNotification("EasyR 项目已恢复。", type = "message")
+        showNotification("RBench 项目已恢复。", type = "message")
       }, error = function(e) {
         status(paste0("恢复失败：", conditionMessage(e)))
         showNotification(conditionMessage(e), type = "error", duration = 10)
