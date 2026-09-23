@@ -15,6 +15,8 @@ stopifnot(
   grepl("EASYR_HOSTED=1", dockerfile, fixed = TRUE),
   grepl("runtime: docker", blueprint, fixed = TRUE),
   grepl("healthCheckPath: /", blueprint, fixed = TRUE),
+  grepl("Deploy-Posit%20Connect%20Cloud%20Free", readme, fixed = TRUE),
+  grepl("https://connect.posit.cloud/", readme, fixed = TRUE),
   grepl("render.com/deploy?repo=https://github.com/Linklee-sad/EasyR", readme, fixed = TRUE),
   grepl("Connect Cloud", readme, fixed = TRUE)
 )
