@@ -7,6 +7,7 @@ ui_html <- as.character(analysis_ui("analysis"))
 stopifnot(grepl("analysis-toggle_style", ui_html, fixed = TRUE),
   grepl("编辑图像", ui_html, fixed = TRUE),
   grepl("折线趋势图", ui_html, fixed = TRUE), grepl("相关性热图", ui_html, fixed = TRUE),
+  !grepl("function_expressions", ui_html, fixed = TRUE),
   grepl("Q-Q 正态检验图", ui_html, fixed = TRUE), grepl("经验累积分布图", ui_html, fixed = TRUE),
   grepl(plot_no_group_value, ui_html, fixed = TRUE))
 
@@ -51,6 +52,13 @@ stopifnot(length(qq$plot$layers) == 2L, grepl("正态分布", qq$notes),
 corr <- build_correlation_plot(iris, 1:4, list(corr_method = "spearman", corr_labels = TRUE))
 stopifnot(inherits(corr$plot, "ggplot"), nrow(corr$stats) == 4L, length(corr$plot$layers) == 2L,
   grepl("Spearman", corr$notes), isTRUE(all.equal(corr$stats$Sepal.Length[1], 1)))
+functions <- build_function_plot("正弦 = sin(x)\n抛物线 = x^2 - 1", -4, 4, 1001,
+  options = list(line_width = 1.5), mark_roots = TRUE)
+stopifnot(inherits(functions$plot, "ggplot"), nrow(functions$stats) == 2L,
+  length(unique(functions$plot$data$.function)) == 2L, grepl("红色圆点", functions$notes),
+  any(grepl("-1", functions$stats$零点, fixed = TRUE)), any(grepl("1", functions$stats$零点, fixed = TRUE)))
+tangent_root <- build_function_plot("切点 = (x - 1)^2", -10, 10, 1000, mark_roots = TRUE)
+stopifnot(grepl("1", tangent_root$stats$零点, fixed = TRUE))
 few <- data.frame(x = 1:4, y = c(3, 5, 6, 7), g = c("a", "a", "b", "b"))
 result <- build_ggplot(few, "scatter", 1, 2, 3, list(smooth = TRUE))
 stopifnot(grepl("不画回归线", result$notes), length(result$plot$layers) == 1)
@@ -64,6 +72,9 @@ fails(build_ggplot(iris, "hist", 5), "数值字段")
 fails(build_ggplot(data.frame(x = 1:30, g = 1:30), "hist", 1, group = 2), "超过 20")
 fails(build_plotly_3d(iris, 1, 1, 3), "三个不同")
 fails(build_correlation_plot(iris, 1), "至少需要选择两个")
+fails(build_function_plot('system("echo unsafe")'), "不支持")
+fails(build_function_plot("y <- x^2"), "不支持")
+fails(build_function_plot("sqrt(x)", 2, -2), "起点小于终点")
 names(dirty)[1] <- "均值 ` / 测试"
 stopifnot(build_ggplot(dirty, "hist", 1)$plot$labels$x == names(dirty)[1])
 
@@ -102,6 +113,10 @@ testServer(analysis_server, args = list(data = reactive(iris), directory = react
   session$flushReact()
   stopifnot(inherits(chart()$plot, "ggplot"), nrow(chart()$stats) == 4L,
     grepl("Pearson", output$notes))
+  session$setInputs(kind = "function", function_expressions = "sin(x)\n平方 = x^2", function_x_min = -3,
+    function_x_max = 3, function_points = 501, function_axes = TRUE, function_grid = TRUE, function_roots = TRUE)
+  session$flushReact()
+  stopifnot(inherits(chart()$plot, "ggplot"), nrow(chart()$stats) == 2L, grepl("2 个函数", output$notes))
 })
 unlink(test_directory, recursive = TRUE)
-cat("ggplot2 十类图形、Plotly 3D 散点图、趋势线、相关性、分组、参考线、分面与导出检查通过。\n")
+cat("ggplot2 函数图像、常用统计图、Plotly 3D、趋势线、相关性、分组、参考线、分面与导出检查通过。\n")

@@ -7,6 +7,186 @@ plot_defaults <- function() list(
   point_size = 2.5, line_width = 1, width = 10, height = 6, dpi = 150
 )
 
+plotting_font_family <- function() {
+  switch(Sys.info()[["sysname"]], Darwin = "Arial Unicode MS", Windows = "Microsoft YaHei", "sans")
+}
+
+function_plot_allowed <- c(
+  "+", "-", "*", "/", "^", "%%", "%/%", "(",
+  "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
+  "exp", "log", "log10", "log2", "sqrt", "abs", "floor", "ceiling",
+  "round", "signif", "pnorm", "dnorm", "pt", "dt", "plogis", "dlogis"
+)
+
+validate_function_expression <- function(node, variables = "x") {
+  if (is.numeric(node) || is.integer(node)) return(invisible(TRUE))
+  if (is.symbol(node)) {
+    if (!as.character(node) %in% c(variables, "pi", "Inf", "NaN")) {
+      stop(sprintf("不支持符号“%s”；变量只能写 %s。", as.character(node), paste(variables, collapse = "、")), call. = FALSE)
+    }
+    return(invisible(TRUE))
+  }
+  if (!is.call(node)) stop("表达式只能包含数值、x 和受支持的数学函数。", call. = FALSE)
+  operator <- as.character(node[[1]])
+  if (length(operator) != 1L || !operator %in% function_plot_allowed) {
+    stop(sprintf("不支持函数或运算“%s”。", paste(operator, collapse = "")), call. = FALSE)
+  }
+  for (argument in as.list(node)[-1]) validate_function_expression(argument, variables)
+  invisible(TRUE)
+}
+
+function_plot_environment <- function(values, variable = "x") {
+  bindings <- list(values, base::pi, Inf, NaN)
+  names(bindings) <- c(variable, "pi", "Inf", "NaN")
+  stats_functions <- c("pnorm", "dnorm", "pt", "dt", "plogis", "dlogis")
+  for (name in function_plot_allowed) {
+    bindings[[name]] <- if (name %in% stats_functions) getExportedValue("stats", name) else get(name, envir = baseenv(), inherits = FALSE)
+  }
+  list2env(bindings, parent = emptyenv())
+}
+
+parse_function_lines <- function(text, max_functions = 6L, variable = "x") {
+  lines <- trimws(unlist(strsplit(as.character(text)[1], "\\r?\\n", perl = TRUE)))
+  lines <- lines[nzchar(lines)]
+  if (!length(lines)) stop("请至少输入一个函数，例如 sin(x)。", call. = FALSE)
+  if (length(lines) > max_functions) stop(sprintf("一次最多绘制 %d 个函数。", max_functions), call. = FALSE)
+  lapply(seq_along(lines), function(i) {
+    line <- lines[i]; label <- line; expression_text <- line
+    parts <- regmatches(line, regexec("^([^=]+?)\\s*=\\s*(.+)$", line, perl = TRUE))[[1]]
+    if (length(parts) == 3L && grepl("^[[:alnum:]_ .()\\x{4e00}-\\x{9fff}-]+$", trimws(parts[2]), perl = TRUE)) {
+      label <- trimws(parts[2]); expression_text <- trimws(parts[3])
+    }
+    expression <- tryCatch(parse(text = expression_text, keep.source = FALSE),
+      error = function(e) stop(sprintf("第 %d 行无法解析：%s", i, conditionMessage(e)), call. = FALSE))
+    if (length(expression) != 1L) stop(sprintf("第 %d 行只能包含一个表达式。", i), call. = FALSE)
+    tryCatch(validate_function_expression(expression[[1]], variable),
+      error = function(e) stop(sprintf("第 %d 行：%s", i, conditionMessage(e)), call. = FALSE))
+    list(label = label, text = expression_text, expression = expression[[1]])
+  })
+}
+
+function_plot_roots <- function(x, y) {
+  valid <- is.finite(x) & is.finite(y); x <- x[valid]; y <- y[valid]
+  if (length(x) < 2L) return(numeric())
+  scale <- stats::median(abs(y), na.rm = TRUE)
+  if (!is.finite(scale) || scale == 0) scale <- max(abs(y), na.rm = TRUE)
+  if (!is.finite(scale) || scale == 0) scale <- 1
+  exact <- x[abs(y) <= max(1e-10, scale * 1e-7)]
+  pairs <- which(y[-length(y)] * y[-1] < 0 & pmax(abs(y[-length(y)]), abs(y[-1])) <= max(1, scale * 20))
+  crossed <- if (length(pairs)) x[pairs] - y[pairs] * (x[pairs + 1] - x[pairs]) / (y[pairs + 1] - y[pairs]) else numeric()
+  middle <- if (length(y) >= 3L) which(abs(y[2:(length(y) - 1)]) <=
+    pmin(abs(y[1:(length(y) - 2)]), abs(y[3:length(y)]))) + 1L else integer()
+  tangent <- vapply(middle, function(i) {
+    fit <- stats::lm(y[c(i - 1L, i, i + 1L)] ~ stats::poly(x[c(i - 1L, i, i + 1L)], 2, raw = TRUE))
+    coefficients <- stats::coef(fit)
+    if (length(coefficients) != 3L || !is.finite(coefficients[3]) || abs(coefficients[3]) < .Machine$double.eps) return(NA_real_)
+    vertex <- -coefficients[2] / (2 * coefficients[3])
+    value <- coefficients[1] + coefficients[2] * vertex + coefficients[3] * vertex^2
+    if (vertex >= x[i - 1L] && vertex <= x[i + 1L] && abs(value) <= max(1e-9, scale * 1e-7)) vertex else NA_real_
+  }, numeric(1))
+  roots <- sort(c(exact, crossed, tangent[is.finite(tangent)]))
+  if (!length(roots)) return(roots)
+  spacing <- max(diff(range(x)), 1) / max(length(x), 2)
+  roots[c(TRUE, diff(roots) > spacing * 1.5)]
+}
+
+build_function_plot_specs <- function(specifications, points = 1000, options = list(),
+    show_axes = TRUE, show_grid = TRUE, mark_roots = FALSE) {
+  o <- modifyList(plot_defaults(), options)
+  points <- suppressWarnings(as.integer(points)[1])
+  if (!is.finite(points) || points < 100L || points > 5000L) stop("绘图点数应在 100～5000 之间。", call. = FALSE)
+  if (!length(specifications)) stop("请至少添加一个函数。", call. = FALSE)
+  labels <- vapply(specifications, function(item) trimws(as.character(item$label)[1]), character(1))
+  if (any(!nzchar(labels))) stop("每个函数都需要名称。", call. = FALSE)
+  if (anyDuplicated(labels)) stop("函数名称不能重复。", call. = FALSE)
+  series <- lapply(seq_along(specifications), function(i) {
+    item <- specifications[[i]]
+    parametric <- identical(item$type, "parametric")
+    lower <- suppressWarnings(as.numeric(if (parametric) item$t_min else item$x_min)[1])
+    upper <- suppressWarnings(as.numeric(if (parametric) item$t_max else item$x_max)[1])
+    if (!is.finite(lower) || !is.finite(upper) || lower >= upper) {
+      stop(sprintf("曲线“%s”的%s必须是两个有限数值，且起点小于终点。", labels[i], if (parametric) "参数范围" else "定义域"), call. = FALSE)
+    }
+    parameter <- seq(lower, upper, length.out = points)
+    evaluate <- function(expression, coordinate) {
+      value <- tryCatch(eval(expression, envir = function_plot_environment(parameter, if (parametric) "t" else "x")),
+        error = function(e) stop(sprintf("曲线“%s”的%s计算失败：%s", labels[i], coordinate, conditionMessage(e)), call. = FALSE))
+      if (!is.numeric(value)) stop(sprintf("曲线“%s”的%s没有返回数值。", labels[i], coordinate), call. = FALSE)
+      if (length(value) == 1L) value <- rep(value, length(parameter))
+      if (length(value) != length(parameter)) stop(sprintf("曲线“%s”的%s返回长度不正确。", labels[i], coordinate), call. = FALSE)
+      as.numeric(value)
+    }
+    if (parametric) {
+      x <- evaluate(item$x_expression, "x(t)")
+      y <- evaluate(item$y_expression, "y(t)")
+    } else {
+      x <- parameter
+      y <- evaluate(item$expression, "f(x)")
+    }
+    valid <- is.finite(x) & is.finite(y); x[!valid] <- NA_real_; y[!valid] <- NA_real_
+    y <- as.numeric(y); y[!is.finite(y)] <- NA_real_
+    if (sum(valid) < 2L) stop(sprintf("曲线“%s”在当前范围内没有足够的有限值。", labels[i]), call. = FALSE)
+    data.frame(.x = x, .y = y, .function = labels[i], .domain = sprintf("%s ∈ [%s, %s]",
+      if (parametric) "t" else "x", format(lower), format(upper)), stringsAsFactors = FALSE)
+  })
+  d <- do.call(rbind, series)
+  d$.function <- factor(d$.function, levels = labels)
+  series_colours <- vapply(specifications, function(item) {
+    if (!is.null(item$color) && length(item$color) == 1L && nzchar(item$color)) as.character(item$color) else NA_character_
+  }, character(1))
+  p <- ggplot2::ggplot(d, ggplot2::aes(.x, .y, group = .function))
+  if (length(specifications) > 1L) {
+    p <- p + ggplot2::geom_path(ggplot2::aes(colour = .function), linewidth = o$line_width, alpha = o$alpha, na.rm = TRUE)
+    p <- if (all(!is.na(series_colours))) p + ggplot2::scale_colour_manual(values = stats::setNames(series_colours, labels), name = "函数") else
+      p + ggplot2::scale_colour_viridis_d(option = o$palette, name = "函数")
+  } else {
+    colour <- if (!is.na(series_colours[1])) series_colours[1] else o$color
+    p <- p + ggplot2::geom_path(colour = colour, linewidth = o$line_width, alpha = o$alpha, na.rm = TRUE)
+  }
+  if (isTRUE(show_axes)) {
+    if (min(d$.x) <= 0 && max(d$.x) >= 0) p <- p + ggplot2::geom_vline(xintercept = 0, colour = "#64748b", linewidth = 0.45)
+    p <- p + ggplot2::geom_hline(yintercept = 0, colour = "#64748b", linewidth = 0.45)
+  }
+  roots_by_function <- lapply(split(d, d$.function, drop = TRUE), function(item) function_plot_roots(item$.x, item$.y))
+  root_data <- do.call(rbind, lapply(names(roots_by_function), function(name) {
+    roots <- roots_by_function[[name]]
+    if (!length(roots)) return(NULL)
+    data.frame(.x = head(roots, 100), .y = 0, .function = name)
+  }))
+  if (isTRUE(mark_roots) && !is.null(root_data) && nrow(root_data)) {
+    p <- p + ggplot2::geom_point(data = root_data, ggplot2::aes(.x, .y), inherit.aes = FALSE,
+      colour = "#dc2626", fill = "white", shape = 21, stroke = 1, size = max(2.5, o$point_size))
+  }
+  theme <- switch(o$theme, classic = ggplot2::theme_classic, bw = ggplot2::theme_bw, ggplot2::theme_minimal)
+  label <- function(custom, fallback) if (length(custom) == 1L && nzchar(trimws(custom))) custom else fallback
+  p <- p + theme(base_size = o$font_size, base_family = plotting_font_family()) +
+    ggplot2::theme(legend.position = "bottom", plot.title.position = "plot",
+      panel.grid = if (isTRUE(show_grid)) ggplot2::element_line() else ggplot2::element_blank()) +
+    ggplot2::labs(title = label(o$title, "函数图像"), x = label(o$x_label, "x"), y = label(o$y_label, "f(x)"))
+  if (any(vapply(specifications, function(item) identical(item$type, "parametric"), logical(1)))) p <- p + ggplot2::coord_equal()
+  if (!isTRUE(show_axes)) p <- p + ggplot2::theme(axis.text = ggplot2::element_blank(), axis.ticks = ggplot2::element_blank(), axis.title = ggplot2::element_blank())
+  stats <- do.call(rbind, lapply(split(d, d$.function, drop = TRUE), function(item) {
+    values <- item$.y[is.finite(item$.y)]; roots <- roots_by_function[[as.character(item$.function[1])]]
+    data.frame(函数 = as.character(item$.function[1]), 定义域 = item$.domain[1],
+      有限点数 = length(values), 最小值 = min(values), 最大值 = max(values),
+      零点 = if (length(roots)) paste(format(signif(head(roots, 8), 6), trim = TRUE), collapse = ", ") else "未发现", check.names = FALSE)
+  }))
+  nonfinite <- sum(!is.finite(d$.y))
+  notes <- sprintf("每个函数使用 %d 个采样点，共绘制 %d 个函数；%d 个非有限结果已断开显示。",
+    points, length(specifications), nonfinite)
+  if (isTRUE(mark_roots)) notes <- paste(notes, "红色圆点是根据采样点估算的零点。")
+  list(plot = p, notes = notes, stats = stats, used = nrow(d) - nonfinite, excluded = nonfinite)
+}
+
+build_function_plot <- function(expressions, x_min = -10, x_max = 10, points = 1000,
+    options = list(), show_axes = TRUE, show_grid = TRUE, mark_roots = FALSE) {
+  specifications <- parse_function_lines(expressions)
+  specifications <- lapply(specifications, function(item) {
+    item$x_min <- x_min; item$x_max <- x_max; item
+  })
+  build_function_plot_specs(specifications, points, options, show_axes, show_grid, mark_roots)
+}
+
 build_correlation_plot <- function(data, variables, options = list()) {
   o <- modifyList(plot_defaults(), options)
   variables <- unique(suppressWarnings(as.integer(variables)))
@@ -38,7 +218,7 @@ build_correlation_plot <- function(data, variables, options = list()) {
   theme <- switch(o$theme, classic = ggplot2::theme_classic, bw = ggplot2::theme_bw, ggplot2::theme_minimal)
   custom_title <- if (length(o$title) == 1L && nzchar(trimws(o$title))) o$title else
     paste0(if (method == "pearson") "Pearson" else "Spearman", " 相关性热图")
-  p <- p + theme(base_size = o$font_size) +
+  p <- p + theme(base_size = o$font_size, base_family = plotting_font_family()) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 40, hjust = 1), plot.title.position = "plot") +
     ggplot2::labs(title = custom_title, x = if (nzchar(trimws(o$x_label))) o$x_label else NULL,
       y = if (nzchar(trimws(o$y_label))) o$y_label else NULL)
@@ -275,7 +455,7 @@ build_ggplot <- function(data, kind, x, y = NULL, group = NULL, options = list()
     if (isTRUE(o$facet) && kind %in% c("hist", "density", "scatter", "line", "qq", "ecdf")) p <- p + ggplot2::facet_wrap(ggplot2::vars(.group), ncol = 2)
   }
   theme <- switch(o$theme, classic = ggplot2::theme_classic, bw = ggplot2::theme_bw, ggplot2::theme_minimal)
-  p <- p + theme(base_size = o$font_size) + ggplot2::theme(legend.position = "bottom", plot.title.position = "plot") +
+  p <- p + theme(base_size = o$font_size, base_family = plotting_font_family()) + ggplot2::theme(legend.position = "bottom", plot.title.position = "plot") +
     ggplot2::labs(title = label(o$title, names(data)[x]), x = label(o$x_label, x_axis), y = label(o$y_label, y_axis))
   list(plot = p, notes = notes, stats = stats, used = nrow(d), excluded = nrow(data) - nrow(d))
 }
@@ -394,7 +574,7 @@ analysis_server <- function(id, data, directory = reactive(getwd())) {
     }, ignoreNULL = FALSE)
     active_group <- reactive({
       current_kind <- if (length(input$kind) == 1L) input$kind else ""
-      if (current_kind %in% c("bar", "correlation") || length(input$group) != 1 || is.na(input$group) ||
+      if (current_kind %in% c("bar", "correlation", "function") || length(input$group) != 1 || is.na(input$group) ||
           !nzchar(input$group) || identical(input$group, plot_no_group_value)) return("")
       candidate <- suppressWarnings(as.integer(input$group))
       excluded <- as.integer(c(input$x,
@@ -419,7 +599,13 @@ analysis_server <- function(id, data, directory = reactive(getwd())) {
       for (name in c("font_size", "width", "height")) updateNumericInput(session, name, value = o[[name]])
     })
     chart <- reactive({
-      req(data(), input$kind)
+      req(input$kind)
+      if (identical(input$kind, "function")) {
+        return(tryCatch(build_function_plot(input$function_expressions, input$function_x_min, input$function_x_max,
+          input$function_points, settings(), input$function_axes, input$function_grid, input$function_roots),
+          error = function(e) validate(need(FALSE, conditionMessage(e)))))
+      }
+      req(data())
       if (!identical(input$kind, "correlation")) req(input$x)
       tryCatch(if (identical(input$kind, "correlation")) {
         build_correlation_plot(data(), input$corr_variables, settings())
@@ -452,8 +638,8 @@ analysis_server <- function(id, data, directory = reactive(getwd())) {
     saved_png <- reactiveVal("")
     output$saved_png <- renderText(saved_png())
     observeEvent(input$save_png, {
-      req(data())
-      if (!identical(input$kind, "correlation")) req(input$x)
+      if (!identical(input$kind, "function")) req(data())
+      if (!input$kind %in% c("correlation", "function")) req(input$x)
       tryCatch({
         path <- save_to_workdir(directory(), "easyr-chart", ".png", write_png)
         saved_png(paste("上次保存：", path))

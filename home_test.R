@@ -9,6 +9,7 @@ stopifnot(
   grepl("startup-card", rendered),
   grepl("创建数据分析项目", rendered),
   grepl("进入学习模式", rendered),
+  grepl("打开函数绘图工具", rendered),
   grepl("打开已有 EasyR 项目", rendered),
   grepl("选择后自动打开项目", rendered),
   !grepl("startup-open_project", rendered, fixed = TRUE),
@@ -45,6 +46,7 @@ imported <- list(
 )
 entered <- reactiveVal(0L)
 learned <- reactiveVal(0L)
+function_plotted <- reactiveVal(0L)
 app_session <- new.env(parent = emptyenv())
 app_session$onFlushed <- function(callback, once = FALSE) callback()
 app_session$sendInputMessage <- function(inputId, message) invisible(NULL)
@@ -53,7 +55,8 @@ channel <- new.env(parent = emptyenv())
 testServer(startup_server, args = list(
   imported = imported, project_channel = channel, app_input = reactiveValues(),
   app_session = app_session, enter_workspace = function() entered(entered() + 1L),
-  enter_learning = function() learned(learned() + 1L)
+  enter_learning = function() learned(learned() + 1L),
+  enter_function_plotter = function() function_plotted(function_plotted() + 1L)
 ), {
   session$setInputs(new_project = 1)
   session$flushReact()
@@ -61,6 +64,9 @@ testServer(startup_server, args = list(
   session$setInputs(learning = 1)
   session$flushReact()
   stopifnot(learned() == 1L)
+  session$setInputs(function_plotter = 1)
+  session$flushReact()
+  stopifnot(function_plotted() == 1L)
   session$setInputs(example_dataset = "mtcars", sample = 1)
   session$flushReact()
   selected_example <- easyr_example_dataset("mtcars")
@@ -74,7 +80,9 @@ app_html <- htmltools::renderTags(app_env$ui)$html
 stopifnot(
   grepl("startup-new_project", app_html, fixed = TRUE),
   grepl("startup-learning", app_html, fixed = TRUE),
+  grepl("startup-function_plotter", app_html, fixed = TRUE),
   grepl("output.learning_ready", app_html, fixed = TRUE),
+  grepl("output.function_plotter_ready", app_html, fixed = TRUE),
   grepl("data-value=\"data_workspace\"", app_html, fixed = TRUE),
   !grepl("data-value=\"distributions\">教学模式</a>", app_html, fixed = TRUE),
   !grepl("data-value=\"home\"", app_html, fixed = TRUE)
@@ -93,7 +101,13 @@ startup_upload <- data.frame(
 
 testServer(app_env$server, {
   session$flushReact()
-  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), FALSE))
+  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), FALSE), identical(function_plotter_started(), FALSE))
+  session$setInputs(`startup-function_plotter` = 1)
+  session$flushReact()
+  stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), FALSE), identical(function_plotter_started(), TRUE))
+  session$setInputs(leave_function_plotter = 1)
+  session$flushReact()
+  stopifnot(identical(function_plotter_started(), FALSE))
   session$setInputs(`startup-learning` = 1)
   session$flushReact()
   stopifnot(identical(workspace_started(), FALSE), identical(learning_started(), TRUE))
@@ -112,4 +126,4 @@ testServer(app_env$server, {
 })
 unlink(startup_project_file)
 
-cat("开始界面、分析项目、独立学习模式、示例数据和无首页工作台检查通过。\n")
+cat("开始界面、分析项目、独立学习模式、独立函数绘图、示例数据和无首页工作台检查通过。\n")

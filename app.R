@@ -11,6 +11,7 @@ source("R/ai.R")
 source("R/preview.R")
 source("R/workbench.R")
 source("R/plotting.R")
+source("R/function_plotter.R")
 source("R/directory.R")
 source("R/plot_editor.R")
 source("R/model_evaluation.R")
@@ -38,8 +39,10 @@ ui <- fluidPage(
   tags$style(HTML(".ai-settings-hero{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:22px;align-items:center;margin-bottom:18px;padding:18px 20px;border:1px solid #d8e4f3;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#eef5ff);overflow:hidden}.ai-settings-intro h3{margin:0 0 8px;color:#173d70}.ai-settings-intro p{margin:0;color:#60758f;line-height:1.65}.ai-provider-character-stage{min-height:190px;display:flex;align-items:center;justify-content:center}.ai-provider-character-stage>.shiny-panel-conditional{width:100%}.ai-character-card{position:relative;height:190px;border:0;border-radius:14px;overflow:hidden;background:transparent;box-shadow:none}.ai-character-image{width:100%;height:100%;display:block;object-fit:contain;object-position:center bottom}.ai-character-placeholder{height:100%;display:flex;align-items:center;justify-content:center;font-size:62px;color:#5a80b5;background:radial-gradient(circle at 50% 35%,#fff,#eaf3ff)}@media(max-width:900px){.ai-settings-hero{grid-template-columns:1fr;padding:15px}.ai-provider-character-stage{min-height:170px}.ai-character-card{height:170px}}")),
   tags$style(HTML(".workspace-page .btn{width:auto;padding:6px 10px;font-size:13px;line-height:1.35;border-radius:7px}.workspace-page .clean-action{width:auto}.workspace-page .clean-button-row{justify-content:flex-start;flex-wrap:wrap}.workspace-page .clean-button-row .btn{flex:0 0 auto}.workspace-page .clean-export-card .shiny-download-link{display:inline-block;width:auto;margin-right:6px}.workspace-page details.ai-parameter-panel,.workspace-page details.ts-source-card{width:auto;border:0;background:transparent;box-shadow:none;padding:0;margin:10px 0}.workspace-page details.ai-parameter-panel>summary,.workspace-page details.ts-source-card>summary{display:inline-flex;width:auto;align-items:center;gap:7px;margin:0;padding:6px 10px;border:1px solid #bfd3ec;border-radius:8px;background:#eef5ff;color:#174a8b;font-size:13px;font-weight:750;list-style:none;box-shadow:none}.workspace-page details.ai-parameter-panel>summary:hover,.workspace-page details.ts-source-card>summary:hover{background:#e1edfc;border-color:#91b6e6}.workspace-page details.ai-parameter-panel>summary::-webkit-details-marker,.workspace-page details.ts-source-card>summary::-webkit-details-marker{display:none}.workspace-page details.ai-parameter-panel>summary:after,.workspace-page details.ts-source-card>summary:after{content:'+';margin-left:3px;font-size:15px;color:#5d7fa8}.workspace-page details.ai-parameter-panel[open]>summary:after,.workspace-page details.ts-source-card[open]>summary:after{content:'−'}.workspace-page details.ai-parameter-panel[open],.workspace-page details.ts-source-card[open]{border:1px solid #d7e3f1;border-radius:10px;background:#fff;padding:10px 12px}.workspace-page details.ai-parameter-panel[open]>summary,.workspace-page details.ts-source-card[open]>summary{margin-bottom:8px}.workspace-page details.ai-parameter-panel .ai-parameter-badge{margin-left:2px;padding:1px 6px;font-size:10px}.workspace-page details.ts-source-card .ts-source-body{padding:10px 0 0;border-top:1px solid #e7eff9}")),
   tags$style(HTML(".easyr-navigation>.tabbable>.nav-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;overflow:visible}.easyr-navigation>.tabbable>.nav-tabs>li{width:100%;min-width:0}.easyr-navigation>.tabbable>.nav-tabs>li>a{display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 8px}.analysis-group-page{padding-top:10px}.workspace-subnav>.tabbable>.nav-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#edf3fa;border:1px solid #dce6f3;border-radius:11px;padding:5px;margin:0 0 16px}.workspace-subnav>.tabbable>.nav-pills:before,.workspace-subnav>.tabbable>.nav-pills:after{display:none}.workspace-subnav>.tabbable>.nav-pills>li{float:none;margin:0}.workspace-subnav>.tabbable>.nav-pills>li>a{border-radius:8px;padding:8px 14px;color:#36577e;font-size:13px;font-weight:750}.workspace-subnav>.tabbable>.nav-pills>li>a:hover{background:#fff;color:#174a8b}.workspace-subnav>.tabbable>.nav-pills>li.active>a{background:#2563eb;color:#fff;box-shadow:0 2px 7px rgba(37,99,235,.18)}@media(max-width:1050px){.easyr-navigation>.tabbable>.nav-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:620px){.easyr-navigation>.tabbable>.nav-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-subnav>.tabbable>.nav-pills>li{flex:1 1 calc(50% - 6px)}.workspace-subnav>.tabbable>.nav-pills>li>a{display:block;text-align:center;padding:8px 6px}}")),
+  tags$style(HTML(".function-plotter-shell{max-width:1400px;margin:0 auto;padding:18px 8px 30px}.function-plotter-content{background:#fff;border:1px solid #e1e8f1;border-radius:16px;padding:20px 22px;box-shadow:0 4px 14px rgba(31,78,139,.05)}.function-plotter-toolbar{display:flex;align-items:end;gap:14px;flex-wrap:wrap;padding:12px 14px 2px;background:#f4f7fb;border-radius:11px}.function-plotter-toolbar>.form-group{min-width:170px;margin-bottom:10px}.function-plotter-toolbar>.checkbox{margin:0 0 16px}.function-plotter-help{color:#667892;line-height:1.55;margin:12px 2px}.function-plotter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.function-plotter-card{border:1px solid #dbe5f1;border-radius:11px;padding:11px 12px 1px;background:#fbfdff}.function-plotter-card-title{font-weight:800;color:#174a8b;margin-bottom:7px}.function-plotter-style{margin:12px 0}.function-plotter-style>summary{display:inline-flex;align-items:center;padding:7px 11px;border:1px solid #bfd3ec;border-radius:8px;background:#eef5ff;color:#174a8b;font-weight:750;cursor:pointer;list-style:none}.function-plotter-style>summary::-webkit-details-marker{display:none}.function-plotter-style-body{border:1px solid #dbe5f1;border-radius:10px;padding:12px 13px 2px;margin-top:8px}.function-plotter-actions{display:flex;gap:8px;flex-wrap:wrap}.function-plotter-saved{color:#667892;font-size:12px;margin-top:7px;overflow-wrap:anywhere}@media(max-width:760px){.function-plotter-grid{grid-template-columns:1fr}.function-plotter-content{padding:14px}.function-plotter-toolbar>.form-group{min-width:140px}}")),
+  tags$style(HTML(".function-plotter-content{padding:0;overflow:hidden}.function-plotter-workspace{display:grid;grid-template-columns:350px minmax(0,1fr);min-height:720px}.function-plotter-sidebar{background:#f8fafc;border-right:1px solid #dbe5f1;padding:16px 14px;overflow-y:auto}.function-plotter-sidebar-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:850;color:#173d70;margin-bottom:4px}.function-plotter-sidebar-hint{font-size:12px;color:#6b7d93;line-height:1.5;margin:0 0 13px}.function-input-row{border-top:1px solid #dce5ef;padding:11px 0 8px}.function-type-line{display:grid;grid-template-columns:12px minmax(0,1fr) 30px;gap:7px;align-items:center}.function-type-line .form-group{margin:0}.function-type-line .form-control{height:31px;padding:3px 8px;font-size:12px}.function-expression-line{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px;align-items:center}.function-formula-line{margin:5px 30px 0 29px}.function-color-dot{width:10px;height:10px;border-radius:50%;display:block}.function-prefix{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#36577e;white-space:nowrap}.function-expression-input .form-group{margin:0}.function-expression-input .form-control{height:36px;border:0;border-bottom:2px solid #b9c9dc;border-radius:0;background:transparent;padding:5px 3px;box-shadow:none;font-size:15px}.function-expression-input .form-control:focus{border-color:#2563eb}.function-remove-button{border:0;background:transparent;color:#8a98aa;padding:5px!important}.function-remove-button:hover{color:#dc2626;background:#fee2e2}.function-domain-line{display:flex;align-items:center;gap:5px;margin:7px 0 0 29px;color:#63758f;font-size:12px}.function-domain-line .form-group{margin:0;width:82px}.function-domain-line .form-control{height:29px;padding:3px 6px;font-size:12px}.function-domain-symbol{white-space:nowrap}.function-add-button{width:100%;margin-top:7px;border:1px dashed #9bb7d9;background:#fff;color:#24558e}.function-plotter-sidebar hr{margin:15px 0}.function-plotter-checks{display:grid;grid-template-columns:1fr}.function-plotter-checks .checkbox{margin:5px 0}.function-plotter-style>summary{width:100%;justify-content:center}.function-plotter-style-body{padding:10px 10px 1px;background:#fff}.function-sidebar-actions{display:flex;gap:6px;margin-top:12px}.function-sidebar-actions>*{flex:1;text-align:center}.function-plotter-canvas{position:relative;padding:18px 22px 14px;min-width:0;background:#fff}.function-empty-hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#8190a4;pointer-events:none}.function-empty-hint .fa{font-size:42px;color:#b6c8dd}.function-empty-hint strong{font-size:18px;color:#58708f}.function-empty-hint span{font-size:13px}@media(max-width:820px){.function-plotter-workspace{grid-template-columns:1fr}.function-plotter-sidebar{border-right:0;border-bottom:1px solid #dbe5f1}.function-plotter-canvas{padding:12px}.function-plotter-checks{grid-template-columns:repeat(3,1fr)}}")),
   language_switch_ui(),
-  conditionalPanel("!output.workspace_ready && !output.learning_ready", startup_ui("startup")),
+  conditionalPanel("!output.workspace_ready && !output.learning_ready && !output.function_plotter_ready", startup_ui("startup")),
   conditionalPanel("output.learning_ready",
     tags$div(class = "learning-shell",
       tags$div(class = "learning-header",
@@ -49,6 +52,15 @@ ui <- fluidPage(
           tags$div(class = "learning-header-subtitle", "概率与统计 · 公式 · 模拟 · 互动演示")),
         actionButton("leave_learning", "返回开始界面", icon = icon("arrow-left"), class = "learning-back")),
       tags$div(class = "learning-content", teaching_mode_ui()))),
+  conditionalPanel("output.function_plotter_ready",
+    tags$div(class = "function-plotter-shell",
+      tags$div(class = "learning-header",
+        tags$div(class = "learning-header-mark", icon("chart-line")),
+        tags$div(class = "learning-header-copy",
+          tags$div(class = "learning-header-title", "EasyR 函数绘图"),
+          tags$div(class = "learning-header-subtitle", "输入函数 · 独立定义域 · 多曲线比较 · PNG 导出")),
+        actionButton("leave_function_plotter", "返回开始界面", icon = icon("arrow-left"), class = "learning-back")),
+      tags$div(class = "function-plotter-content", function_plotter_ui("function_plotter")))),
   conditionalPanel("output.workspace_ready",
     tags$div(class = "easyr-app-header",
       tags$div(class = "easyr-brand-mark", icon("chart-simple")),
@@ -100,16 +112,20 @@ server <- function(input, output, session) {
   directory <- reactive(normalizePath(getwd(), winslash = "/", mustWork = TRUE))
   workspace_started <- reactiveVal(FALSE)
   learning_started <- reactiveVal(FALSE)
+  function_plotter_started <- reactiveVal(FALSE)
   output$workspace_ready <- reactive(workspace_started())
   output$learning_ready <- reactive(learning_started())
+  output$function_plotter_ready <- reactive(function_plotter_started())
   outputOptions(output, "workspace_ready", suspendWhenHidden = FALSE)
   outputOptions(output, "learning_ready", suspendWhenHidden = FALSE)
+  outputOptions(output, "function_plotter_ready", suspendWhenHidden = FALSE)
   project_channel <- new.env(parent = emptyenv())
   imported <- import_server("import")
   data <- workbench_server("clean", imported$data, directory, imported$name, project_channel)
   project_server("project", imported, project_channel, input, session)
   enter_workspace <- function() {
     learning_started(FALSE)
+    function_plotter_started(FALSE)
     workspace_started(TRUE)
     session$onFlushed(function() {
       session$sendInputMessage("main_navigation", list(value = "data_workspace"))
@@ -118,10 +134,21 @@ server <- function(input, output, session) {
   }
   enter_learning <- function() {
     workspace_started(FALSE)
+    function_plotter_started(FALSE)
     learning_started(TRUE)
   }
-  startup_server("startup", imported, project_channel, input, session, enter_workspace, enter_learning)
+  enter_function_plotter <- function() {
+    workspace_started(FALSE)
+    learning_started(FALSE)
+    function_plotter_started(TRUE)
+  }
+  startup_server("startup", imported, project_channel, input, session, enter_workspace, enter_learning, enter_function_plotter)
   observeEvent(input$leave_learning, {
+    learning_started(FALSE)
+    workspace_started(FALSE)
+  })
+  observeEvent(input$leave_function_plotter, {
+    function_plotter_started(FALSE)
     learning_started(FALSE)
     workspace_started(FALSE)
   })
@@ -131,6 +158,7 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
   preview_server("preview", data, ai_config)
   analysis_server("analysis", data, directory)
+  function_plotter_server("function_plotter", directory)
   teaching_mode_server(directory)
   regression_server("regression", data, directory, ai_config)
   logistic_regression_server("logistic_regression", data, directory, ai_config)

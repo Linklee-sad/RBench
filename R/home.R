@@ -12,6 +12,9 @@ startup_ui <- function(id) {
         actionButton(ns("learning"), "进入学习模式", icon = icon("graduation-cap"),
           class = "btn-default startup-learning"),
         tags$p(class = "startup-learning-hint", "从概率与统计基础开始，通过公式、模拟和互动图形逐步学习。"),
+        actionButton(ns("function_plotter"), "打开函数绘图工具", icon = icon("chart-line"),
+          class = "btn-default startup-learning startup-function-plotter"),
+        tags$p(class = "startup-learning-hint", "直接输入数学函数并绘图，不需要创建项目或导入数据。"),
         tags$div(class = "startup-divider", tags$span("打开已有分析项目")),
         fileInput(ns("project_file"), "打开已有 EasyR 项目", accept = c(".easyr", ".rds"),
           buttonLabel = "选择项目文件", placeholder = "尚未选择项目文件"),
@@ -28,12 +31,14 @@ startup_ui <- function(id) {
   )
 }
 
-startup_server <- function(id, imported, project_channel, app_input, app_session, enter_workspace, enter_learning) {
+startup_server <- function(id, imported, project_channel, app_input, app_session, enter_workspace, enter_learning,
+    enter_function_plotter = function() NULL) {
   moduleServer(id, function(input, output, session) {
     status <- reactiveVal("创建一个新项目，或打开之前保存的 .easyr 项目。")
 
     observeEvent(input$new_project, enter_workspace())
     observeEvent(input$learning, enter_learning())
+    observeEvent(input$function_plotter, enter_function_plotter())
 
     observeEvent(input$sample, {
       example <- easyr_example_dataset(input$example_dataset)
